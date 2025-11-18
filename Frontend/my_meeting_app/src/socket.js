@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-const socket = io("https://streamapp-webapp.onrender.com", {
+const socket = io("https://streamapp-uyjv.onrender.com", {
   transports: ["websocket"],
   withCredentials: true,
   autoConnect: true,
