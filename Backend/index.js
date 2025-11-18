@@ -12,7 +12,10 @@ import { socketHandler } from './controller/socketHandler.js';
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", 
+    origin: [
+    "https://streamapp-webapp.onrender.com",  // your frontend
+    "http://localhost:5173",                  // local dev
+    ],
     methods: ["GET", "POST"], 
     credentials: true
   }
