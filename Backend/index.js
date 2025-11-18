@@ -1,52 +1,60 @@
 import express from 'express';
-const app = express();
 import cors from 'cors';
 import router from './routes/route.js';
 import dotenv from 'dotenv';
 import http from 'http';
-const server = http.createServer(app);
 import connectDB from './MongoDB/db.js';
 import { Server } from 'socket.io';
-import cloudinary from './cloudinaryClient.js';
+import { v2 as cloudinary } from 'cloudinary';
 import { socketHandler } from './controller/socketHandler.js';
 
-dotenv.config();
-const port = process.env.PORT || 3000;
+dotenv.config(); 
 
-// ====== CORS FIX HERE ======
-app.use(cors({
-  origin: [
-    "https://streamapp-webapp.onrender.com",
-    "http://localhost:5173"
-  ],
-  credentials: true
-}));
+const app = express();
+const server = http.createServer(app);
+const PORT = process.env.PORT || 3000;
 
-app.options("*", cors());   // allow preflight
+// Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true
+});
 
+// Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-connectDB();
-
-const io = new Server(server, {
-  cors: {
-    origin: [
-      "https://streamapp-webapp.onrender.com",
-      "http://localhost:5173",
-    ],
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+// ⭐ HEALTH CHECK ROUTE — VERY IMPORTANT FOR RENDER
+app.get("/", (req, res) => {
+  res.send("Backend working ✔");
 });
 
-socketHandler(io);
-
-// Your routes
+// Load routes normally (NOT inside DB connect)
 app.use('/', router);
 
-server.listen(port, () => {
-  console.log("app is running on port " + port);
+// SOCKET.IO
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
 });
+socketHandler(io);
+
+// CONNECT TO DB THEN START SERVER
+connectDB()
+  .then(() => {
+    console.log("MongoDB connected!");
+
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error("MongoDB connection error:", err);
+  });
 
 export default cloudinary;
