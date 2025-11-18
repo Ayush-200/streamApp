@@ -1,7 +1,7 @@
 import express from 'express';
 import { StreamClient  } from "@stream-io/node-sdk";
 const router = express.Router();
-import { User, MeetingDB } from '../MongoDB/model.js'
+import { User, MeetingDB, MeetingParticipantDB } from '../MongoDB/model.js'
 import cloudinary from '../index.js';
 import multer from 'multer';
 import { mergeAndDownloadVideo } from '../FFmpeg.js';
@@ -33,23 +33,117 @@ router.get('/token/:userId', (req, res)=>{
     res.json({token});
 })
 
-router.post('/upload/:meetingId', upload.single('file'), function(req, res, next){
+router.post('/upload/:meetingId', upload.single('file'), async function(req, res, next){
   
    const meetingId = req.params.meetingId;
+    // Accept either a userId (preferred) or userEmail from the upload form
+    const userEmail = req.body.userEmail;
+    const userIdFromBody = req.body.userId;
+    const participantIdentifier = userIdFromBody || userEmail; // matches MeetingParticipantDB.participants.userId
+    const leaveTime = new Date(); // Time when user left the meeting
+    const uploadTime = new Date(); // Time when video is being uploaded
+   
     console.log("file uploaded: ", req.file);
+    console.log("participant identifier (userId or email):", participantIdentifier);
 
-    cloudinary.uploader.upload(`${req.file.path}`, {
-      resource_type: "video",   // ✅ Must-have for video uploads
-      public_id: `video-${Date.now()}` , 
-      tags: [meetingId] // ✅ Optional, lets you name the file in Cloudinary
-    })
-    .then(result => console.log("the result is", result))
-    .then(() => mergeAndDownloadVideo(meetingId))
-    .catch(error => console.error(error));
+   try {
+     // Find participant record to get joinTime
+     let joinTime = null;
+     let participantRecord = null;
+     let cloudinaryResult = null;
+     
+     if (participantIdentifier) {
+       const meetingParticipant = await MeetingParticipantDB.findOne({ meetingId });
+       
+       if (meetingParticipant && meetingParticipant.participants) {
+        //  Find the specific participant
+        console.log("inside finding participant join time");
+        participantRecord = meetingParticipant.participants.find(
+          p => p.userId === participantIdentifier
+        );
+         
+         if (participantRecord) {
+           joinTime = participantRecord.joinTime;
+           console.log("Found participant - joinTime:", joinTime);
+         }
+         else{
+          console.log("participant not found:");
+         }
+       }
+     }
 
+     // Upload to Cloudinary with metadata
 
-    res.json({success: true, fileName : req.file.filename});
-  
+    if(joinTime){
+
+      cloudinaryResult = await cloudinary.uploader.upload(`${req.file.path}`, {
+       resource_type: "video",   // ✅ Must-have for video uploads
+       public_id: `video-${Date.now()}` , 
+       tags: [meetingId, userEmail || 'unknown'], // Tags for filtering
+       context: {
+         meetingId: meetingId,
+         userEmail: userEmail || 'unknown',
+         joinTime:  joinTime.toISOString(),
+         leaveTime: leaveTime.toISOString(),
+         uploadTime: uploadTime.toISOString()
+       }
+     });
+
+     console.log("cloudinary secure url", cloudinaryResult.secure_url);
+
+     // Atomically set videoPublicId and leaveTime on the matched participant
+     const updateResult = await MeetingParticipantDB.findOneAndUpdate(
+      {
+        meetingId: meetingId,
+        "participants.userId": participantIdentifier
+      },
+      {
+        $set: {
+          "participants.$.videoPublicId": cloudinaryResult.public_id,
+          "participants.$.leaveTime": leaveTime
+        }
+      },
+      { new: true }
+     );
+
+     if (!updateResult) {
+       console.warn("Warning: failed to update participant with videoPublicId/leaveTime. Participant not found in DB.");
+     }
+
+     console.log("Cloudinary upload result:", cloudinaryResult);
+
+    }
+    else{
+      console.log("video not uploaded because of join time", joinTime);
+    }
+     // Decrement participantCount (await to ensure DB update completes)
+     await MeetingParticipantDB.findOneAndUpdate(
+       { meetingId: meetingId },
+       { $inc: { participantCount: -1 } }
+     );
+
+     // Trigger video merging (if needed)
+    //  mergeAndDownloadVideo(meetingId).catch(error => {
+    //    console.error("Error merging videos:", error);
+    //  });
+
+     res.json({
+       success: true, 
+       fileName: req.file.filename,
+       cloudinaryPublicId: cloudinaryResult.public_id,
+       joinTime: joinTime,
+       leaveTime: leaveTime,
+       uploadTime: uploadTime
+     });
+
+   } catch (error) {
+     console.error("Error in upload route:", error);
+     res.status(500).json({
+       success: false,
+       message: "Error uploading video",
+       error: error.message
+     });
+   }
 
 })
 

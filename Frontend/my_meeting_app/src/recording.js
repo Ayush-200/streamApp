@@ -1,7 +1,22 @@
 let mediaRecorder;
 let chunks = [];
+let currentStream = null;
+let isRecording = false;
+let currentMeetingName = null;
+let currentUserEmail = null;
+let cleanupHandlers = [];
 
-export async function startRecording(meetingName) {
+// Track recording state
+export function isRecordingActive() {
+  return isRecording && mediaRecorder && mediaRecorder.state === 'recording';
+}
+
+// Get current meeting name
+export function getCurrentMeetingName() {
+  return currentMeetingName;
+}
+
+export async function startRecording(meetingName, userEmail = null) {
   if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     console.log("getUserMedia supported.");
 
@@ -12,8 +27,10 @@ export async function startRecording(meetingName) {
         audio: true,
       });
 
-      // Show preview (optional)
-    //   document.querySelector("#preview").srcObject = stream;
+      currentStream = stream;
+      currentMeetingName = meetingName;
+      currentUserEmail = userEmail;
+      isRecording = true;
 
       // Setup recorder
       mediaRecorder = new MediaRecorder(stream, {
@@ -25,18 +42,32 @@ export async function startRecording(meetingName) {
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "video/webm" });
-        chunks = [];
-        console.log("onstop")
-
-        // Save locally or upload to backend
-        uploadRecording(blob, meetingName);
+        if (chunks.length > 0) {
+          const blob = new Blob(chunks, { type: "video/webm" });
+          console.log("Recording stopped, uploading...", blob.size, "bytes");
+          
+          // Upload recording
+          uploadRecording(blob, meetingName, currentUserEmail);
+        } else {
+          console.log("No recording data to upload");
+        }
+        
+        // Cleanup
+        cleanup();
       };
+
+      mediaRecorder.onerror = (event) => {
+        console.error("MediaRecorder error:", event.error);
+      };
+
+      // Setup cleanup handlers for page unload
+      setupCleanupHandlers(meetingName);
 
       mediaRecorder.start(1000); // collect data every 1s
       console.log("Recording started.");
     } catch (err) {
       console.error("Error accessing camera/mic:", err);
+      isRecording = false;
     }
   } else {
     console.log("getUserMedia not supported!");
@@ -44,17 +75,156 @@ export async function startRecording(meetingName) {
 }
 
 export function stopRecording(meetingName) {
-  mediaRecorder.stop();
-  console.log("Recording stopped.");
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+    console.log("Recording stopped manually.");
+  }
 }
 
-function uploadRecording(blob, meetingName) {
-    console.log("inside upload function");
+// Setup event handlers for page unload/close
+function setupCleanupHandlers(meetingName) {
+  // Remove existing handlers
+  cleanupHandlers.forEach(({ event, handler, target }) => {
+    target.removeEventListener(event, handler);
+  });
+  cleanupHandlers = [];
+
+  // Handler for page unload (user closes tab/browser)
+  const handleBeforeUnload = (e) => {
+    if (isRecordingActive()) {
+      // Stop recording before page unloads
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        try {
+          mediaRecorder.requestData();
+          try{
+            mediaRecorder.stop();
+          }catch(e){}
+          // Request final data
+          mediaRecorder.requestData();
+        } catch (err) {
+          console.error("Error stopping recorder on unload:", err);
+        }
+      }
+      
+      // Upload using fetch with keepalive (more reliable than sendBeacon for FormData)
+      if (chunks.length > 0) {
+        const blob = new Blob(chunks, { type: "video/webm" });
+        uploadRecordingWithKeepalive(blob, meetingName, currentUserEmail);
+      }
+    }
+  };
+
+  // Handler for visibility change (tab switch, minimize)
+  const handleVisibilityChange = () => {
+    if (document.hidden && isRecordingActive()) {
+      // Tab is hidden, but keep recording
+      // We'll upload when they come back or leave
+      console.log("Tab hidden, recording continues...");
+    }
+  };
+
+  // Handler for pagehide (more reliable than beforeunload)
+  const handlePageHide = (e) => {
+    if (isRecordingActive()) {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        mediaRecorder.requestData();
+      }
+      
+      // Upload using keepalive
+      if (chunks.length > 0) {
+        const blob = new Blob(chunks, { type: "video/webm" });
+        uploadRecordingWithKeepalive(blob, meetingName, currentUserEmail);
+      }
+    }
+  };
+
+  // Add event listeners
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  window.addEventListener('pagehide', handlePageHide);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+
+  cleanupHandlers = [
+    { event: 'beforeunload', handler: handleBeforeUnload, target: "window" },
+    { event: 'pagehide', handler: handlePageHide, target: "window" },
+    { event: 'visibilitychange', handler: handleVisibilityChange, target: "document" }
+  ];
+}
+
+// Cleanup function
+function cleanup() {
+  // Stop all tracks
+  if (currentStream) {
+    currentStream.getTracks().forEach(track => {
+      track.stop();
+    });
+    currentStream = null;
+  }
+
+  // Clear chunks
+  chunks = [];
+  isRecording = false;
+  currentMeetingName = null;
+  currentUserEmail = null;
+
+  // Remove event listeners
+  cleanupHandlers.forEach(({ event, handler }) => {
+    window.removeEventListener(event, handler);
+    document.removeEventListener(event, handler);
+  });
+  cleanupHandlers = [];
+}
+
+// Export cleanup function for manual cleanup
+export function cleanupRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+  cleanup();
+}
+
+// Upload with keepalive (for page unload scenarios)
+function uploadRecordingWithKeepalive(blob, meetingName, userEmail) {
   const formData = new FormData();
   formData.append("file", blob, `user-${Date.now()}.webm`);
+  if (userEmail) {
+    formData.append("userEmail", userEmail);
+  }
 
   fetch(`http://localhost:3000/upload/${meetingName}`, {
     method: "POST",
     body: formData,
-  }).then((res) => console.log("Uploaded:", res));
+    keepalive: true, // Ensures request continues even if page closes
+  })
+  .then((res) => {
+    console.log("Uploaded on page unload:", res);
+  })
+  .catch((err) => {
+    console.error("Upload failed on page unload:", err);
+  });
+}
+
+// Regular upload function
+function uploadRecording(blob, meetingName, userEmail) {
+  console.log("inside upload function");
+  const formData = new FormData();
+  formData.append("file", blob, `user-${Date.now()}.webm`);
+  if (userEmail) {
+    formData.append("userEmail", userEmail);
+  }
+
+  fetch(`http://localhost:3000/upload/${meetingName}`, {
+    method: "POST",
+    body: formData,
+  })
+  .then((res) => {
+    console.log("Uploaded:", res);
+    if (!res.ok) {
+      throw new Error(`Upload failed: ${res.status}`);
+    }
+  })
+  .catch((err) => {
+    console.error("Upload error:", err);
+    // Optionally retry or save locally
+  });
 }
