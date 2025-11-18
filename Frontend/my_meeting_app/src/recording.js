@@ -203,28 +203,48 @@ function uploadRecordingWithKeepalive(blob, meetingName, userEmail) {
     console.error("Upload failed on page unload:", err);
   });
 }
-
-// Regular upload function
-function uploadRecording(blob, meetingName, userEmail) {
+async function uploadRecording(blob, meetingName, userEmail) {
   console.log("inside upload function");
+
   const formData = new FormData();
   formData.append("file", blob, `user-${Date.now()}.webm`);
-  if (userEmail) {
-    formData.append("userEmail", userEmail);
-  }
 
-  fetch(`https://streamapp-uyjv.onrender.com/upload/${meetingName}`, {
-    method: "POST",
-    body: formData,
-  })
-  .then((res) => {
-    console.log("Uploaded:", res);
-    if (!res.ok) {
-      throw new Error(`Upload failed: ${res.status}`);
+  // Optional metadata
+  if (userEmail) formData.append("userEmail", userEmail);
+  formData.append("upload_preset", "YOUR_UNSIGNED_PRESET"); // must match your Cloudinary preset
+  formData.append("folder", `meeting_recordings/${meetingName}`); // optional: organize by meeting
+
+  try {
+    const cloudRes = await fetch(
+      "https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/video/upload",
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    const cloudData = await cloudRes.json();
+
+    if (!cloudData.secure_url) {
+      console.error("Cloudinary error:", cloudData);
+      throw new Error("Cloudinary upload failed");
     }
-  })
-  .catch((err) => {
-    console.error("Upload error:", err);
-    // Optionally retry or save locally
-  });
+
+    console.log("Uploaded to Cloudinary:", cloudData.secure_url);
+
+    // Optionally, notify your server that this participant uploaded
+    await fetch(`https://streamapp-uyjv.onrender.com/participantUploaded/${meetingName}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userEmail,
+        videoUrl: cloudData.secure_url
+      })
+    });
+
+    return cloudData.secure_url;
+  } catch (err) {
+    console.error("Upload failed:", err);
+    throw err;
+  }
 }

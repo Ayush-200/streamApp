@@ -11,15 +11,15 @@ const apiSecret = "86wmmssfy926tzyvz3362j8f63mwrd2p2p9yex9ftgkpspchejmn8pzxp6zys
 const client = new StreamClient(apiKey, apiSecret);
 
 
-// const storage = multer.diskStorage({
-//     destination: function(req, file, cb){
-//         cb(null, "./uploads")
-//     }, 
-//     filename: function(req, file, cb){
-//         cb(null,  `${Date.now()}-${file.originalname}`);
-//     }
-// })
-// const upload = multer({ storage });
+const storage = multer.diskStorage({
+    destination: function(req, file, cb){
+        cb(null, "./uploads")
+    }, 
+    filename: function(req, file, cb){
+        cb(null,  `${Date.now()}-${file.originalname}`);
+    }
+})
+const upload = multer({ storage });
 
 
 router.get('/', async(req,res) =>{
@@ -34,82 +34,36 @@ router.get('/token/:userId', (req, res)=>{
 })
 
 
-router.post('/upload/:meetingId', upload.single("file"), async (req, res) => {
+router.post('/participantUploaded/:meetingId', async (req, res) => {
+  const { meetingId } = req.params;
+  const { userEmail, videoUrl } = req.body;
+
   try {
-    const meetingId = req.params.meetingId;
-    const participantIdentifier = req.body.userId || req.body.userEmail;
-
-    if (!req.file) {
-      return res.status(400).json({ error: "No video file uploaded" });
-    }
-
-    if (!participantIdentifier) {
-      return res.status(400).json({ error: "Missing userId/userEmail in body" });
-    }
-
-    console.log("File received from:", participantIdentifier);
-
-    // ------------ UPLOAD TO CLOUDINARY -------------
-    const cloudinaryResult = await new Promise((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
-        {
-          resource_type: "video",
-          folder: "meeting_recordings",
-          public_id: `${meetingId}-${participantIdentifier}-${Date.now()}`
-        },
-        (err, result) => {
-          if (err) reject(err);
-          else resolve(result);
-        }
-      ).end(req.file.buffer);
-    });
-
-    console.log("Cloudinary uploaded:", cloudinaryResult.secure_url);
-
-    // ------------ SAVE TO MONGODB -------------------
     const meeting = await MeetingParticipantDB.findOne({ meetingId });
-    if (!meeting) {
-      return res.status(404).json({ error: "Meeting not found in DB" });
-    }
+    if (!meeting) return res.status(404).json({ error: "Meeting not found" });
 
-    const participant = meeting.participants.find(
-      p => p.userId === participantIdentifier
-    );
+    const participant = meeting.participants.find(p => p.userId === userEmail);
+    if (!participant) return res.status(404).json({ error: "Participant not found" });
 
-    if (!participant) {
-      return res.status(404).json({ error: "Participant not found in meeting" });
-    }
-
-    participant.leaveTime = new Date();
+    participant.videoUrl = videoUrl;
     participant.uploadTime = new Date();
-    participant.videoUrl = cloudinaryResult.secure_url;
 
     await meeting.save();
 
-    console.log("Participant upload saved to DB.");
-
-    // ------------ CHECK IF ALL PARTICIPANTS UPLOADED ---------------
-    const allUploaded = meeting.participants.every(
-      p => p.videoUrl && p.videoUrl !== ""
-    );
-
+    // Check if all participants uploaded
+    const allUploaded = meeting.participants.every(p => p.videoUrl);
     if (allUploaded) {
       console.log("All participants uploaded → merging videos...");
       mergeAndDownloadVideo(meetingId);
-    } else {
-      console.log("Waiting for others to upload...");
     }
 
-    return res.status(200).json({
-      success: true,
-      videoUrl: cloudinaryResult.secure_url
-    });
-
+    return res.json({ success: true });
   } catch (err) {
-    console.error("Upload error:", err);
-    return res.status(500).json({ error: "Internal server error", details: err.message });
+    console.error("Error saving participant upload:", err);
+    return res.status(500).json({ error: err.message });
   }
 });
+
 
 
 
