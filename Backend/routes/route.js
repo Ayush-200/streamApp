@@ -34,7 +34,7 @@ router.get('/token/:userId', (req, res)=>{
 })
 
 
-router.post('/participantUploaded/:meetingId', async (req, res) => {
+router.post('/upload/:meetingId', async (req, res) => {
   const { meetingId } = req.params;
   const { userEmail, videoUrl } = req.body;
 
