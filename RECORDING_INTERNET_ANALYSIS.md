@@ -304,3 +304,6 @@ To test with slow internet:
 - Upload may be slow or fail ⚠️
 - No error message shown ❌
 
+
+
+<!-- Okay, so I have made two projects in one stack, but whenever when someone says me to write something without seeing the internet or AI, I am unable to write that. So what should I do? I can write it by seeing the documentation and using AI, but I'm not able to write by myself. I understand the code that has been written and remembers the code for some days, but after one day or two days, I just forget it. So what should I do so that in interview I can write the code or implement any given scenario if interviewers give me? -->
