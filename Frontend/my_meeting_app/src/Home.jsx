@@ -24,7 +24,7 @@ const Home = ({ setJoin }) => {
      
      console.log(user.email);
      const fetchMeetings = async() => {
-       const response = await fetch(`https://streamapp-webapp.onrender.com/getUserMeetings/${emailId}`);
+       const response = await fetch(`https://streamapp-uyjv.onrender.com/getUserMeetings/${emailId}`);
        const data = await response.json();
        console.log("data ")
        console.log(data);

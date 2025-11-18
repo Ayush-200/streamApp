@@ -191,7 +191,7 @@ function uploadRecordingWithKeepalive(blob, meetingName, userEmail) {
     formData.append("userEmail", userEmail);
   }
 
-  fetch(`https://streamapp-webapp.onrender.com/upload/${meetingName}`, {
+  fetch(`https://streamapp-uyjv.onrender.com/upload/${meetingName}`, {
     method: "POST",
     body: formData,
     keepalive: true, // Ensures request continues even if page closes
@@ -213,7 +213,7 @@ function uploadRecording(blob, meetingName, userEmail) {
     formData.append("userEmail", userEmail);
   }
 
-  fetch(`https://streamapp-webapp.onrender.com/upload/${meetingName}`, {
+  fetch(`https://streamapp-uyjv.onrender.com/upload/${meetingName}`, {
     method: "POST",
     body: formData,
   })

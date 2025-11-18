@@ -9,11 +9,11 @@ const CreateMeetingForm = () => {
        const handleSubmit = async () => {
     if (meetingName.trim()) {
       const trimMeetingName  = meetingName.trim();
-      const response = await fetch(`https://streamapp-webapp.onrender.com/getAlreadyCreatedMeeting/${trimMeetingName}`);
+      const response = await fetch(`https://streamapp-uyjv.onrender.com/getAlreadyCreatedMeeting/${trimMeetingName}`);
       const exists = await response.json();
       console.log("exists  ", exists);
       if(!exists){
-        await fetch(`https://streamapp-webapp.onrender.com/addMeetingName/${trimMeetingName}`)
+        await fetch(`https://streamapp-uyjv.onrender.com/addMeetingName/${trimMeetingName}`)
         navigate(`/meeting/${encodeURIComponent(meetingName)}`);
       }
       else{

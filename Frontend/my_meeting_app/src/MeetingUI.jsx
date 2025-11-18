@@ -55,7 +55,7 @@
       
         let userId = user.email.replace(/[@.]/g, "_");
         // replace with dynamic id if needed
-        const response = await fetch(`https://streamapp-webapp.onrender.com/token/${userId}`);
+        const response = await fetch(`https://streamapp-uyjv.onrender.com/token/${userId}`);
         const { token } = await response.json();
 
         const userObj = { id: userId , name: user.name};
@@ -125,7 +125,7 @@
 
       socket.on("download_ready", ({url}) =>{
       console.log("download ready at: ", url);
-      window.location.href = `https://streamapp-webapp.onrender.com${url}`;
+      window.location.href = `https://streamapp-uyjv.onrender.com${url}`;
       })
       
       socket.on("joined_meeting", (meetingId) => {
