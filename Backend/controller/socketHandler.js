@@ -16,6 +16,8 @@ export function socketHandler(io) {
                 console.log(`${socket.id} joined meeting: ${meetingId}`);
 
                 // Add participant to DB if not already present
+
+                const participant = await MeetingDB.findOne({})
                 const meetingDoc = await MeetingParticipantDB.findOne({ meetingId });
                 if (!meetingDoc) {
                     await MeetingParticipantDB.create({

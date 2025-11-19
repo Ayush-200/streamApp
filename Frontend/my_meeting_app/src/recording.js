@@ -231,6 +231,8 @@ async function uploadRecording(blob, meetingId, userEmail) {
 
     // --- Step 2: Notify backend ---
     // Backend expects JSON, so send userEmail and videoUrl
+    console.log("userEMail", userEmail);
+    console.log("videoUrl", cloudData.secure_url);
     const backendRes = await fetch(
       `https://streamapp-uyjv.onrender.com/upload/${meetingId}`,
       {

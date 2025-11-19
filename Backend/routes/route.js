@@ -33,44 +33,48 @@ router.get('/token/:userId', (req, res)=>{
     res.json({token});
 })
 
-
 router.post('/upload/:meetingId', async (req, res) => {
     const { meetingId } = req.params;
-    // Log headers and body to help debug multipart requests
+
     console.log('content-type:', req.headers['content-type']);
     console.log('req.body:', req.body);
     console.log('req.file:', req.file && req.file.originalname);
 
     // Accept either a file upload form (multipart/form-data) or JSON body
-    const { userEmail, videoUrl } = req.body || {};
+    const { userId, videoPublicId } = req.body || {};
 
-  try {
-    const meeting = await MeetingParticipantDB.findOne({ meetingId });
-    if (!meeting) return res.status(404).json({ error: "Meeting not found" });
-
-    const participant = meeting.participants.find(p => p.userId === userEmail);
-    if (!participant) return res.status(404).json({ error: "Participant not found" });
-
-    participant.videoUrl = videoUrl;
-    participant.uploadTime = new Date();
-
-    await meeting.save();
-
-    // Check if all participants uploaded
-    const allUploaded = meeting.participants.every(p => p.videoUrl);
-    if (allUploaded) {
-      console.log("All participants uploaded → merging videos...");
-      mergeAndDownloadVideo(meetingId);
+    if (!userId || !videoPublicId) {
+        return res.status(400).json({ error: "userId and videoPublicId are required" });
     }
 
-    return res.json({ success: true });
-  } catch (err) {
-    console.error("Error saving participant upload:", err);
-    return res.status(500).json({ error: err.message });
-  }
+    try {
+        // Find meeting
+        const meeting = await MeetingParticipantDB.findOne({ meetingId });
+        if (!meeting) return res.status(404).json({ error: "Meeting not found" });
+
+        // Find participant
+        const participant = meeting.participants.find(p => p.userId === userId);
+        if (!participant) return res.status(404).json({ error: "Participant not found" });
+
+        // Update participant's uploaded video info
+        participant.videoPublicId = videoPublicId;
+        participant.uploadTime = new Date(); // optional: can track upload time
+
+        await meeting.save();
+
+        // Check if all participants uploaded
+        const allUploaded = meeting.participants.every(p => p.videoPublicId);
+        if (allUploaded) {
+            console.log("All participants uploaded → merging videos...");
+            mergeAndDownloadVideo(meetingId);
+        }
+
+        return res.json({ success: true });
+    } catch (err) {
+        console.error("Error saving participant upload:", err);
+        return res.status(500).json({ error: err.message });
+    }
 });
-
-
 
 
 router.get("/getUserMeetings/:emailId", async(req, res) =>{ 
