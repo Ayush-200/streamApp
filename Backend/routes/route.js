@@ -35,9 +35,14 @@ router.get('/token/:userId', (req, res)=>{
 
 
 router.post('/upload/:meetingId', async (req, res) => {
-  const { meetingId } = req.params;
-  console.log("req.body:", req.body);
-  const { userEmail, videoUrl } = req.body;
+    const { meetingId } = req.params;
+    // Log headers and body to help debug multipart requests
+    console.log('content-type:', req.headers['content-type']);
+    console.log('req.body:', req.body);
+    console.log('req.file:', req.file && req.file.originalname);
+
+    // Accept either a file upload form (multipart/form-data) or JSON body
+    const { userEmail, videoUrl } = req.body || {};
 
   try {
     const meeting = await MeetingParticipantDB.findOne({ meetingId });
