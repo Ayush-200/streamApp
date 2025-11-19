@@ -206,6 +206,8 @@ function uploadRecordingWithKeepalive(blob, meetingId, userEmail) {
 
 async function uploadRecording(blob, meetingId, userEmail) {
   console.log("inside upload function");
+      console.log("userEMail", userEmail);
+    
 
   // --- Step 1: Upload to Cloudinary ---
   const formData = new FormData();
@@ -220,7 +222,9 @@ async function uploadRecording(blob, meetingId, userEmail) {
       { method: "POST", body: formData }
     );
 
+    
     const cloudData = await cloudRes.json();
+    console.log("videoUrl", cloudData.secure_url);
 
     if (!cloudData.secure_url) {
       console.error("Cloudinary upload failed:", cloudData);
@@ -231,8 +235,7 @@ async function uploadRecording(blob, meetingId, userEmail) {
 
     // --- Step 2: Notify backend ---
     // Backend expects JSON, so send userEmail and videoUrl
-    console.log("userEMail", userEmail);
-    console.log("videoUrl", cloudData.secure_url);
+
     const backendRes = await fetch(
       `https://streamapp-uyjv.onrender.com/upload/${meetingId}`,
       {
