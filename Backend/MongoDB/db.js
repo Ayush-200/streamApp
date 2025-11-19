@@ -10,6 +10,10 @@ const connectDB = async () => {
         });
         // console.log("mongo uri is ", process.env.MONGO_URI);
         console.log("mongodb connected!", mongoose.connection.name);
+         console.log("Cluster host:", conn.connection.host); // cluster host
+    console.log("Cluster port:", conn.connection.port); // usually 27017 for Atlas
+    console.log("Database name:", conn.connection.name); // database you are connected to
+    console.log("Client info:", conn.connection.client.s.options.srvHost); // Atlas cluster URL
         const collections = await mongoose.connection.db.listCollections().toArray();
         console.log("Collections in DB:", collections.map(c => c.name));
     }
