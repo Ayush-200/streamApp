@@ -233,7 +233,7 @@ async function uploadRecording(blob, meetingName, userEmail) {
     console.log("Uploaded to Cloudinary:", cloudData.secure_url);
 
     // Optionally, notify your server that this participant uploaded
-    await fetch(`https://streamapp-uyjv.onrender.com/participantUploaded/${meetingName}`, {
+    await fetch(`https://streamapp-uyjv.onrender.com/upload/${meetingName}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
