@@ -184,14 +184,14 @@ export function cleanupRecording() {
 }
 
 // Upload with keepalive (for page unload scenarios)
-function uploadRecordingWithKeepalive(blob, meetingName, userEmail) {
+function uploadRecordingWithKeepalive(blob, meetingId, userEmail) {
   const formData = new FormData();
   formData.append("file", blob, `user-${Date.now()}.webm`);
   if (userEmail) {
     formData.append("userEmail", userEmail);
   }
 
-  fetch(`https://streamapp-uyjv.onrender.com/upload/${meetingName}`, {
+  fetch(`https://streamapp-uyjv.onrender.com/upload/${meetingId}`, {
     method: "POST",
     body: formData,
     keepalive: true, // Ensures request continues even if page closes
@@ -203,28 +203,24 @@ function uploadRecordingWithKeepalive(blob, meetingName, userEmail) {
     console.error("Upload failed on page unload:", err);
   });
 }
-async function uploadRecording(blob, meetingName, userEmail) {
+
+async function uploadRecording(blob, meetingId, userEmail) {
   console.log("inside upload function");
 
+  // Upload to Cloudinary
   const formData = new FormData();
   formData.append("file", blob, `user-${Date.now()}.webm`);
-
-  // Optional metadata
   if (userEmail) formData.append("userEmail", userEmail);
-  formData.append("upload_preset", "YOUR_UNSIGNED_PRESET"); // must match your Cloudinary preset
-  formData.append("folder", `meeting_recordings/${meetingName}`); // optional: organize by meeting
+  formData.append("upload_preset", "YOUR_UNSIGNED_PRESET"); // Cloudinary preset
+  formData.append("folder", `meeting_recordings/${meetingId}`); // optional folder
 
   try {
     const cloudRes = await fetch(
-      "https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/video/upload",
-      {
-        method: "POST",
-        body: formData,
-      }
+      `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload`,
+      { method: "POST", body: formData }
     );
 
     const cloudData = await cloudRes.json();
-
     if (!cloudData.secure_url) {
       console.error("Cloudinary error:", cloudData);
       throw new Error("Cloudinary upload failed");
@@ -232,8 +228,8 @@ async function uploadRecording(blob, meetingName, userEmail) {
 
     console.log("Uploaded to Cloudinary:", cloudData.secure_url);
 
-    // Optionally, notify your server that this participant uploaded
-    await fetch(`https://streamapp-uyjv.onrender.com/upload/${meetingName}`, {
+    // Notify backend
+    await fetch(`https://streamapp-uyjv.onrender.com/upload/${meetingId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
