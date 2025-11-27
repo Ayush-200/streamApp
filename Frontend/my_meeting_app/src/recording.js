@@ -206,25 +206,25 @@ function uploadRecordingWithKeepalive(blob, meetingId, userEmail) {
 
 async function uploadRecording(blob, meetingId, userEmail) {
   console.log("inside upload function");
-      console.log("userEMail", userEmail);
+  console.log("userEMail", userEmail);
     
 
   // --- Step 1: Upload to Cloudinary ---
   const formData = new FormData();
   formData.append("file", blob, `user-${Date.now()}.webm`);
-  formData.append("upload_preset", "YOUR_UNSIGNED_PRESET"); // Cloudinary unsigned preset
+  formData.append("upload_preset", "THIS_IS_MY_PRESET"); // Cloudinary unsigned preset
   formData.append("folder", `meeting_recordings/${meetingId}`); // optional folder
 
   try {
     // NOTE: Replace 'YOUR_CLOUD_NAME' with your actual Cloudinary cloud name
     const cloudRes = await fetch(
-      `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload`,
+      `https://api.cloudinary.com/v1_1/dm87mlkpe/video/upload`,
       { method: "POST", body: formData }
     );
 
     
     const cloudData = await cloudRes.json();
-    console.log("videoUrl", cloudData.secure_url);
+    console.log("videoUrl", cloudData);
 
     if (!cloudData.secure_url) {
       console.error("Cloudinary upload failed:", cloudData);
@@ -242,8 +242,8 @@ async function uploadRecording(blob, meetingId, userEmail) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userEmail,       // your participant's email
-          videoUrl: cloudData.secure_url // Cloudinary video URL
+          userId: userEmail,       // your participant's email
+          videoPublicId: cloudData.secure_url // Cloudinary video URL
         })
       }
     );
@@ -254,7 +254,7 @@ async function uploadRecording(blob, meetingId, userEmail) {
     return cloudData.secure_url; // return Cloudinary URL for further use
 
   } catch (err) {
-    console.error("Upload failed:", err);
+    console.error("Upload failed:", err.message);
     throw err;
   }
 }
