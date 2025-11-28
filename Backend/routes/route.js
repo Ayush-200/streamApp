@@ -5,6 +5,7 @@ import { User, MeetingDB, MeetingParticipantDB } from '../MongoDB/model.js'
 import cloudinary from '../index.js';
 import multer from 'multer';
 import { mergeAndDownloadVideo } from '../FFmpeg.js';
+import axios from 'axios';
 // import User from '../MongoDB/model.js'
 const apiKey = "55gcbd3wd3nk";
 const apiSecret = "86wmmssfy926tzyvz3362j8f63mwrd2p2p9yex9ftgkpspchejmn8pzxp6zyscdg"; // keep private!
@@ -66,9 +67,15 @@ router.post('/upload/:meetingId', async (req, res) => {
         const allUploaded = meeting.participants.every(p => p.videoPublicId);
         if (allUploaded) {
             console.log("All participants uploaded → merging videos...");
-            mergeAndDownloadVideo(meetingId);
+            const videoUrls = meeting.participants.map(p => p.videoPublicId);
+            try{
+                const mergedVideos = await axios.post('http://3.7.82.141:8080/stitch',
+                    { videoUrls: videoUrls})
+                res.json({ success: true, mergedVideoUrl: mergedVideos.data.mergedVideoUrl });
+            }catch(err){
+                console.error("Error merging videos:", err);
+            }
         }
-
         return res.json({ success: true });
     } catch (err) {
         console.error("Error saving participant upload:", err);
