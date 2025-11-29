@@ -69,14 +69,13 @@ router.post('/upload/:meetingId', async (req, res) => {
             console.log("All participants uploaded → merging videos...");
             const videoUrls = meeting.participants.map(p => p.videoPublicId);
             try{
-                const mergedVideos = await axios.post('http://3.7.82.141:8080/stitch',
+                const mergedVideos = await axios.post('http:/15.207.63.218:8080/stitch',
                     { videoUrls: videoUrls})
-                res.json({ success: true, mergedVideoUrl: mergedVideos.data.mergedVideoUrl });
+                return res.json({ success: true, mergedVideoUrl: mergedVideos.data.url });
             }catch(err){
                 console.error("Error merging videos:", err);
             }
         }
-        return res.json({ success: true });
     } catch (err) {
         console.error("Error saving participant upload:", err);
         return res.status(500).json({ error: err.message });
