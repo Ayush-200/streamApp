@@ -65,6 +65,7 @@ router.post('/upload/:meetingId', async (req, res) => {
 
         // Check if all participants uploaded
         const allUploaded = meeting.participants.every(p => p.videoPublicId);
+        console.log("allUploaded", allUploaded);
         if (allUploaded) {
             console.log("All participants uploaded → merging videos...");
             const videoUrls = meeting.participants.map(p => p.videoPublicId);
