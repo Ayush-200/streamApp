@@ -35,7 +35,7 @@ Now, the recording automatically stops and uploads when the user leaves, regardl
 3. **Automatic Upload on Leave:**
    ```javascript
    // Uses fetch with keepalive flag
-   fetch(`http://localhost:3000/upload/${meetingName}`, {
+   fetch(`http://localhost:3000upload/${meetingName}`, {
      method: "POST",
      body: formData,
      keepalive: true, // Continues even after page closes

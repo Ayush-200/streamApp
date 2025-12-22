@@ -74,9 +74,10 @@ export function socketHandler(io) {
 
         });
 
-        socket.on("merge_and_download_videos", (meetingId) => { 
-            console.log("merhe and downlaod video socket triggered");
-            mergeAndDownloadVideo(meetingId);
+        socket.on("merge_and_download_videos", async(meetingId) => { 
+            console.log("merge and downlaod video socket triggered");
+            // mergeAndDownloadVideo(meetingId);
+           
         })
 
         socket.on("disconnect", () => {

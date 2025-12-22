@@ -46,7 +46,7 @@ function uploadRecording(blob, meetingName) {
   const formData = new FormData();
   formData.append("file", blob, `user-${Date.now()}.webm`);
 
-  fetch(`http://localhost:3000/upload/${meetingName}`, {
+  fetch(`http://localhost:3000upload/${meetingName}`, {
     method: "POST",
     body: formData,
   }).then((res) => console.log("Uploaded:", res));
@@ -160,7 +160,7 @@ async function uploadRecording(blob, meetingName, retries = 3) {
 
   for (let i = 0; i < retries; i++) {
     try {
-      const response = await fetch(`http://localhost:3000/upload/${meetingName}`, {
+      const response = await fetch(`http://localhost:3000upload/${meetingName}`, {
         method: "POST",
         body: formData,
         signal: AbortSignal.timeout(300000), // 5 minute timeout
@@ -210,7 +210,7 @@ function uploadRecording(blob, meetingName) {
     console.error("Upload failed!");
   });
   
-  xhr.open('POST', `http://localhost:3000/upload/${meetingName}`);
+  xhr.open('POST', `http://localhost:3000upload/${meetingName}`);
   xhr.send(formData);
 }
 ```
@@ -246,7 +246,7 @@ async function uploadRecordingChunked(blob, meetingName) {
     formData.append('totalChunks', totalChunks);
     formData.append('meetingName', meetingName);
     
-    await fetch(`http://localhost:3000/upload-chunk/${meetingName}`, {
+    await fetch(`http://localhost:3000upload-chunk/${meetingName}`, {
       method: "POST",
       body: formData,
     });
