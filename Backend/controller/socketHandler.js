@@ -68,7 +68,7 @@ export function socketHandler(io) {
             io.to(meetingId).emit("stop_recording");
 
             io.to(meetingId).emit("merge_and_download_videos", meetingId);
-            // await mergeAndDownloadVideo(meetingId);
+            await mergeAndDownloadVideo(meetingId);
             // io.to(meetingId).emit("download_ready", ({url: `/download/${meetingId}`}));
 
 
@@ -76,7 +76,7 @@ export function socketHandler(io) {
 
         socket.on("merge_and_download_videos", async(meetingId) => { 
             console.log("merge and downlaod video socket triggered");
-            // mergeAndDownloadVideo(meetingId);
+            mergeAndDownloadVideo(meetingId);
            
         })
 
