@@ -389,18 +389,35 @@
 
 
 export async function mergeAndDownloadVideo(meetingId) {
-  console.log("inside merge and donwload");
+  console.log("inside merge and download");
+
   const video1 = participantsDoc.participants[0]?.videoPublicId;
   const video2 = participantsDoc.participants[1]?.videoPublicId;
-  const fetchAndMerge = await fetch(`${FFMPEG_WORKER_URL}/stitch`,{ 
-    method: "POST", 
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ videoUrls: [video1, video2]})
-  })
 
-  if(!fetchAndMerge.ok){
-    console.error("FFMPEG Worker error:", await fetchAndMerge.text());
+  // 1. Validate inputs
+  if (!video1 || !video2) {
+    throw new Error("Both participant videos must exist before merging");
   }
 
+  // 2. Call FFmpeg worker
+  const response = await fetch(`${FFMPEG_WORKER_URL}/stitch`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      videoUrls: [video1, video2]
+    })
+  });
+
+  // 3. Handle failure properly
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`FFmpeg worker error: ${errorText}`);
+  }
+
+  // 4. Parse and return result
+  const { url } = await response.json();
+  return url;
 }
 
