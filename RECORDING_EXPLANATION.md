@@ -54,7 +54,7 @@ function uploadRecording(blob, meetingName) {
   formData.append("file", blob, `user-${Date.now()}.webm`);
   
   // Uploads to Backend/uploads/ folder
-  fetch(`http://localhost:3000/upload/${meetingName}`, {
+  fetch(`http://localhost:3000upload/${meetingName}`, {
     method: "POST",
     body: formData,
   });

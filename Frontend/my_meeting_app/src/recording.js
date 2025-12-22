@@ -22,7 +22,7 @@ export async function startRecording(meetingName, userEmail = null) {
 
     try {
       // Capture both video and audio
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({ 
         video: true,
         audio: true,
       });
@@ -191,7 +191,7 @@ function uploadRecordingWithKeepalive(blob, meetingId, userEmail) {
     formData.append("userEmail", userEmail);
   }
 
-  fetch(`https://streamapp-uyjv.onrender.com/upload/${meetingId}`, {
+  fetch(`http://localhost:3000/upload/${meetingId}`, {
     method: "POST",
     body: formData,
     keepalive: true, // Ensures request continues even if page closes
@@ -237,7 +237,7 @@ async function uploadRecording(blob, meetingId, userEmail) {
     // Backend expects JSON, so send userEmail and videoUrl
 
     const backendRes = await fetch(
-      `https://streamapp-uyjv.onrender.com/upload/${meetingId}`,
+      `http://localhost:3000/upload/${meetingId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

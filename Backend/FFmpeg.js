@@ -337,52 +337,70 @@
 //     });
 //   });
 // }
-import { spawn } from "child_process";
-import path from "path";
-import { MeetingParticipantDB } from "./MongoDB/model.js";
-import fs from "fs";
+// import { spawn } from "child_process";
+// import path from "path";
+// import { MeetingParticipantDB } from "./MongoDB/model.js";
+// import fs from "fs";
+
+
+// export async function mergeAndDownloadVideo(meetingId) {
+//   const cloud_name = process.env.CLOUDINARY_CLOUD_NAME
+//   // Ensure temp directory
+//   fs.mkdirSync("tmp", { recursive: true });
+
+//   // 1. Fetch document correctly
+//   const participantsDoc = await MeetingParticipantDB.findOne({ meetingId }).lean();
+//   if (!participantsDoc) throw new Error("Meeting not found");
+
+//   const video1 = participantsDoc.participants[0]?.videoPublicId;
+//   const video2 = participantsDoc.participants[1]?.videoPublicId;
+
+//   if (!video1 || !video2) throw new Error("Missing participant videos");
+
+//   const url1 = `https://res.cloudinary.com/<${cloud_name}>/video/upload/${video1}.mp4`;
+//   const url2 = `https://res.cloudinary.com/<${cloud_name}>/video/upload/${video2}.mp4`;
+
+//   const outputFile = path.join("tmp", `final-${meetingId}.mp4`);
+
+//   return new Promise((resolve, reject) => {
+//     const ffmpeg = spawn("ffmpeg", [
+//       "-y",
+//       "-i", url1,
+//       "-i", url2,
+
+//       // SIDE-BY-SIDE MERGE
+//       "-filter_complex", "hstack=inputs=2",
+
+//       "-c:v", "libx264",
+//       "-c:a", "aac",
+
+//       outputFile
+//     ]);
+
+//     ffmpeg.stderr.on("data", d => console.log(d.toString()));
+//     ffmpeg.on("error", reject);
+
+//     ffmpeg.on("close", code => {
+//       if (code === 0) resolve(outputFile);
+//       else reject(new Error("ffmpeg exited with code " + code));
+//     }); 
+//   });
+// }
 
 
 export async function mergeAndDownloadVideo(meetingId) {
-  const cloud_name = process.env.CLOUDINARY_CLOUD_NAME
-  // Ensure temp directory
-  fs.mkdirSync("tmp", { recursive: true });
-
-  // 1. Fetch document correctly
-  const participantsDoc = await MeetingParticipantDB.findOne({ meetingId }).lean();
-  if (!participantsDoc) throw new Error("Meeting not found");
-
+  console.log("inside merge and donwload");
   const video1 = participantsDoc.participants[0]?.videoPublicId;
   const video2 = participantsDoc.participants[1]?.videoPublicId;
+  const fetchAndMerge = await fetch(`${FFMPEG_WORKER_URL}/stitch`,{ 
+    method: "POST", 
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ videoUrls: [video1, video2]})
+  })
 
-  if (!video1 || !video2) throw new Error("Missing participant videos");
+  if(!fetchAndMerge.ok){
+    console.error("FFMPEG Worker error:", await fetchAndMerge.text());
+  }
 
-  const url1 = `https://res.cloudinary.com/<${cloud_name}>/video/upload/${video1}.mp4`;
-  const url2 = `https://res.cloudinary.com/<${cloud_name}>/video/upload/${video2}.mp4`;
-
-  const outputFile = path.join("tmp", `final-${meetingId}.mp4`);
-
-  return new Promise((resolve, reject) => {
-    const ffmpeg = spawn("ffmpeg", [
-      "-y",
-      "-i", url1,
-      "-i", url2,
-
-      // SIDE-BY-SIDE MERGE
-      "-filter_complex", "hstack=inputs=2",
-
-      "-c:v", "libx264",
-      "-c:a", "aac",
-
-      outputFile
-    ]);
-
-    ffmpeg.stderr.on("data", d => console.log(d.toString()));
-    ffmpeg.on("error", reject);
-
-    ffmpeg.on("close", code => {
-      if (code === 0) resolve(outputFile);
-      else reject(new Error("ffmpeg exited with code " + code));
-    }); 
-  });
 }
+
