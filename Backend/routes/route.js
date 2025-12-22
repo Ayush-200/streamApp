@@ -2,7 +2,7 @@ import express from 'express';
 import { StreamClient  } from "@stream-io/node-sdk";
 const router = express.Router();
 import { User, MeetingDB, MeetingParticipantDB } from '../MongoDB/model.js'
-import cloudinary from '../index.js';
+import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
 import { mergeAndDownloadVideo } from '../FFmpeg.js';
 import axios from 'axios';
@@ -24,7 +24,7 @@ const upload = multer({ storage });
 
 
 router.get('/', async(req,res) =>{
-    const user = await User.findOne({email: ""});
+    res.json({ message: "API routes working" });
 })
 
 router.get('/token/:userId', (req, res)=>{
