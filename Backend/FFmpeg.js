@@ -387,9 +387,12 @@
 //   });
 // }
 
-
+import dotenv from "dotenv";
+import { MeetingParticipantDB } from "./MongoDB/model";
+dotenv.config();
 export async function mergeAndDownloadVideo(meetingId) {
   console.log("inside merge and donwload");
+  const participantsDoc = await MeetingParticipantDB.findOne({ meetingId }).lean();
   const video1 = participantsDoc.participants[0]?.videoPublicId;
   const video2 = participantsDoc.participants[1]?.videoPublicId;
 
