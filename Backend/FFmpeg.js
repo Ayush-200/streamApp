@@ -404,7 +404,7 @@ export async function mergeAndDownloadVideo(meetingId) {
   })
 
   if(!fetchAndMerge.ok){
-    console.error("FFMPEG Worker error:", await fetchAndMerge.text());
+    console.error("FFMPEG Worker error:", await fetchAndMerge.text()); 
   }
 
 }
