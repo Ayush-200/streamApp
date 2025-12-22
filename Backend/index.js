@@ -23,7 +23,15 @@ cloudinary.config({
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: "https://streamapp-webapp.onrender.com",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+}));
+
+app.options("*", cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
