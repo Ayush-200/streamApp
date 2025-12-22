@@ -46,10 +46,12 @@ app.use('/', router);
 // SOCKET.IO
 const io = new Server(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: "https://streamapp-webapp.onrender.com",
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
+
 socketHandler(io);
 
 // CONNECT TO DB THEN START SERVER
