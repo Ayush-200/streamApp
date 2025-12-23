@@ -9,6 +9,7 @@ import MeetingUIWrapper from './MeetingUIWrapper';
 import CreateMeetingForm from './CreateMeetingForm';
 import ScheduleMeeting from './ScheduleMeeting';
 import JoinMeetingForm from './JoinMeetingForm';
+import ViewRecording from './ViewRecording';
 
 function App() {
 

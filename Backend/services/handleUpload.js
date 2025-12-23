@@ -1,8 +1,17 @@
+import multer from 'multer';
 import axios from 'axios';
-import { MeetingParticipantDB } from '../MongoDB/model.js';
 import dotenv from 'dotenv';
 dotenv.config();
+import { StreamClient } from "@stream-io/node-sdk";
+import {MeetingParticipantDB } from '../MongoDB/model.js';
+import { handleUpload } from '../services/handleUpload.js';
+import dotenv from 'dotenv';
 
+dotenv.config();
+
+const apiKey = process.env.API_KEY;
+const apiSecret = process.env.API_SECRET;
+const client = new StreamClient(apiKey, apiSecret);
 const ffmpegUrl = process.env.FFMPEG_WORKER_URL;
 
 export const handleUpload = (async (req, res) => {
