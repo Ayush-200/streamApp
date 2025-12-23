@@ -1,8 +1,5 @@
-import { cleanupRecording } from "../../Frontend/my_meeting_app/src/recording.js";
-import { mergeAndDownloadVideo } from "../FFmpeg.js";
 import { MeetingDB } from "../MongoDB/model.js";
 import { MeetingParticipantDB } from "../MongoDB/model.js";
-import increaseMeetingParticipants from "../services/increaseMeetingParticipants.js";
 let current_meeting_id = null;
 export function socketHandler(io) {
         io.on("connection", (socket) => {
@@ -18,7 +15,6 @@ export function socketHandler(io) {
 
                 // Add participant to DB if not already present
 
-                const participant = await MeetingDB.findOne({})
                 const meetingDoc = await MeetingParticipantDB.findOne({ meetingId });
                 if (!meetingDoc) {
                     await MeetingParticipantDB.create({
@@ -27,17 +23,13 @@ export function socketHandler(io) {
                         participants: [{ userId, joinTime: new Date() }]
                     });
                 } else {
-                    const exists = meetingDoc.participants.some(p => p.userId === userId);
-                    // if (!exists) {
                         meetingDoc.participants.push({ userId, joinTime: new Date() });
                         meetingDoc.participantCount = meetingDoc.participants.length;
                         await meetingDoc.save();
-                    // }
+                  
                 }
-
                 // Update everyone in meeting (emit current socket room size)
                 await updateParticipantCount(meetingId, io);
-
                 // Acknowledge join
                 socket.emit("joined_meeting", meetingId);
 
@@ -49,7 +41,6 @@ export function socketHandler(io) {
 
 
         socket.on("start_recording", (meetingId) => {
-            console.log("tello")
             console.log("start_recording from:", socket.id);
 
             io.to(meetingId).emit("start_recording");
@@ -65,23 +56,9 @@ export function socketHandler(io) {
 
         socket.on("stop_recording", async (meetingId) => {
             console.log("stop_recording from:", socket.id);
-            io.to(meetingId).emit("stop_recording");
-
-            // io.to(meetingId).emit("merge_and_download_videos", meetingId);
-            // await mergeAndDownloadVideo(meetingId);
-            // io.to(meetingId).emit("download_ready", ({url: `/download/${meetingId}`}));
-
-
         });
 
-        socket.on("merge_and_download_videos", async(meetingId) => { 
-            console.log("merge and downlaod video socket triggered");
-            // mergeAndDownloadVideo(meetingId);
-           
-        })
-
         socket.on("disconnect", () => {
-
             console.log("socket disconnected:", socket.id);
             if (current_meeting_id) {
                 updateParticipantCount(current_meeting_id, io);
@@ -109,7 +86,6 @@ async function updateParticipantCount(meetingId, io){
 
     if (participantCount === 0) {
         await MeetingDB.deleteOne({ meetingName: meetingId });
-        mergeAndDownloadVideo(meetingId);
         console.log("Meeting deleted because no participants left");
     }
 
