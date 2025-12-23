@@ -1,10 +1,12 @@
 import { StreamClient } from "@stream-io/node-sdk";
 import dotenv from 'dotenv';
+import { generateUserToken } from '../services/generateToken.js';
 dotenv.config();
 
 const apiKey = process.env.API_KEY;
 const apiSecret = process.env.API_SECRET;
 const client = new StreamClient(apiKey, apiSecret);
+const ffmpegUrl = process.env.FFMPEG_WORKER_URL;
 
 export const generateUserToken = (async(req, res) => {
     const userId = req.params.userId;

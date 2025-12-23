@@ -1,5 +1,7 @@
+import { StreamClient } from "@stream-io/node-sdk";
 import { MeetingDB } from '../MongoDB/model.js';
 import dotenv from 'dotenv';
+import { addMeeting } from '../services/addMeeting.js';
 dotenv.config();
 
 export const addMeeting = ( async (req, res) => {

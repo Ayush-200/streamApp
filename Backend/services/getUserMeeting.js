@@ -1,5 +1,10 @@
-import { User } from '../MongoDB/model.js';
+import express from 'express';
+import { StreamClient } from "@stream-io/node-sdk";
+import { MeetingDB } from '../MongoDB/model.js';
+
+
 import dotenv from 'dotenv';
+import { getUserMeetings } from '../services/getUserMeeting.js';
 dotenv.config();
 
 export const getUserMeetings = (async (req, res) => {
