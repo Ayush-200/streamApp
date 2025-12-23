@@ -1,8 +1,6 @@
-import { cleanupRecording } from "../../Frontend/my_meeting_app/src/recording.js";
-import { mergeAndDownloadVideo } from "../FFmpeg.js";
+import { mergeAndDownloadVideo } from "../services/FFmpeg.js";
 import { MeetingDB } from "../MongoDB/model.js";
 import { MeetingParticipantDB } from "../MongoDB/model.js";
-import increaseMeetingParticipants from "../services/increaseMeetingParticipants.js";
 let current_meeting_id = null;
 export function socketHandler(io) {
         io.on("connection", (socket) => {
@@ -66,11 +64,6 @@ export function socketHandler(io) {
         socket.on("stop_recording", async (meetingId) => {
             console.log("stop_recording from:", socket.id);
             io.to(meetingId).emit("stop_recording");
-
-            // io.to(meetingId).emit("merge_and_download_videos", meetingId);
-            // await mergeAndDownloadVideo(meetingId);
-            // io.to(meetingId).emit("download_ready", ({url: `/download/${meetingId}`}));
-
 
         });
 

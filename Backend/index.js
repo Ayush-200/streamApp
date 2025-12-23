@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import router from './routes/route.js';
 import dotenv from 'dotenv';
 import http from 'http';
 import connectDB from './MongoDB/db.js';
@@ -8,7 +7,9 @@ import { Server } from 'socket.io';
 import { v2 as cloudinary } from 'cloudinary';
 import { socketHandler } from './controller/socketHandler.js';
 
-dotenv.config(); 
+dotenv.config();
+
+import router from './routes/route.js'; 
 
 const app = express();
 const server = http.createServer(app);
