@@ -1,6 +1,7 @@
 import React from 'react'
 import { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { apiUrl } from './config';
 
 
 const ScheduleMeeting = () => {
@@ -14,7 +15,7 @@ const ScheduleMeeting = () => {
   //   const fetchMeetings = async() => {
   //     if (isLoading || !isAuthenticated || !user) return;
   //   const emailId = user.email;
-  //   const response = await fetch(`http://localhost:3000/getUserMeetings/${emailId}`);
+  //   const response = await fetch(apiUrl(`getUserMeetings/${emailId}`));
   //   const data = await response.json();
   //   console.log("data ")
   //   console.log(data);
@@ -36,7 +37,7 @@ const ScheduleMeeting = () => {
         return;
       }
       const emailId = user.email;
-      const response = await fetch(`http://localhost:3000/addUsersMeetings/${emailId}`, {
+      const response = await fetch(apiUrl(`addUsersMeetings/${emailId}`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -61,7 +62,7 @@ const ScheduleMeeting = () => {
     
     console.log(user.email);
     const fetchMeetings = async() => {
-      const response = await fetch(`http://localhost:3000/getUserMeetings/${emailId}`);
+      const response = await fetch(apiUrl(`getUserMeetings/${emailId}`));
       const data = await response.json();
       console.log("data ")
       console.log(data);

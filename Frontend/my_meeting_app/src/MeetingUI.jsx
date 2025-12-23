@@ -16,6 +16,7 @@
   import  socket  from './socket.js';
   import { useAuth0 } from "@auth0/auth0-react";
   import {startRecording, stopRecording, cleanupRecording, isRecordingActive } from './recording.js';
+  import { apiUrl } from './config';
   const apiKey = "55gcbd3wd3nk";
 
   const MeetingUI = ({ showParticipantList, setShowParticipantList, join, setJoin }) => {
@@ -55,7 +56,7 @@
       
         let userId = user.email.replace(/[@.]/g, "_");
         // replace with dynamic id if needed
-        const response = await fetch(`http://localhost:3000/token/${userId}`);
+        const response = await fetch(apiUrl(`token/${userId}`));
         const { token } = await response.json();
 
         const userObj = { id: userId , name: user.name};
@@ -125,7 +126,7 @@
 
       socket.on("download_ready", ({url}) =>{
       console.log("download ready at: ", url);
-      window.location.href = `http://localhost:3000${url}`;
+      window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${url}`;
       })
       
       socket.on("joined_meeting", (meetingId) => {
