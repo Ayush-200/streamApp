@@ -4,6 +4,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { FaPlus, FaPhone, FaCalendarAlt, FaClock } from 'react-icons/fa';
 import { MdFiberManualRecord } from 'react-icons/md';
 import { useEffect } from 'react';
+import { apiUrl } from './config';
 
 const Home = ({ setJoin }) => {
 
@@ -24,7 +25,7 @@ const Home = ({ setJoin }) => {
      
      console.log(user.email);
      const fetchMeetings = async() => {
-       const response = await fetch(`http://localhost:3000/getUserMeetings/${emailId}`);
+       const response = await fetch(apiUrl(`getUserMeetings/${emailId}`));
        const data = await response.json();
        console.log("data ")
        console.log(data);
@@ -133,7 +134,7 @@ const Home = ({ setJoin }) => {
        <div className="flex gap-4 overflow-x-auto h-[90px]">
   {meetings.length > 0 ? (
     meetings.map((m, i) => (
-      <div onClick={() =>window.location.href=`http://localhost:5173/meeting/${m.meeting}`}
+      <div onClick={() => window.location.href=`/meeting/${m.meeting}`}
         key={i}
         className="flex flex-col justify-center min-w-[200px] p-4 bg-slate-700 rounded-lg text-white shadow-md hover:bg-[#EA2264]"
       >

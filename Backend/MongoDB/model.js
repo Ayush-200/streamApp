@@ -30,6 +30,3 @@ const meetingParticipantSchema = new mongoose.Schema({
    export const User = mongoose.model('User', userSchema);
    export const MeetingDB = mongoose.model('Meeting', meetingSchema);
    export const MeetingParticipantDB = mongoose.model('MeetingParticipant', meetingParticipantSchema);
-//    export const VideoSchemaDB = mongoose.model('VideoSchemaDB', VideoSchema);
-//    export default {User, MeetingDB};
- 

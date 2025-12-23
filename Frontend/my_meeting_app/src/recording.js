@@ -191,7 +191,9 @@ function uploadRecordingWithKeepalive(blob, meetingId, userEmail) {
     formData.append("userEmail", userEmail);
   }
 
-  fetch(`http://localhost:3000/upload/${meetingId}`, {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  
+  fetch(`${API_URL}/upload/${meetingId}`, {
     method: "POST",
     body: formData,
     keepalive: true, // Ensures request continues even if page closes
@@ -237,7 +239,7 @@ async function uploadRecording(blob, meetingId, userEmail) {
     // Backend expects JSON, so send userEmail and videoUrl
 
     const backendRes = await fetch(
-      `http://localhost:3000/upload/${meetingId}`,
+      `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/upload/${meetingId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
