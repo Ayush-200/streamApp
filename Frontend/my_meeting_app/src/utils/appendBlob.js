@@ -1,63 +1,112 @@
 import { db } from "../db/db";
-import { v2 as cloudinary } from 'cloudinary';
+import axios from 'axios';
 
+let isUploading = false; // Prevent concurrent uploads
 
-cloudinary.config({
-  cloud_name: import.meta.env.CLOUDINARY_CLOUD_NAME,
-  api_key: import.meta.env.CLOUDINARY_API_KEY,
-  api_secret: import.meta.env.CLOUDINARY_API_SECRET
-});
+export async function appendBlob({ userEmail, meetingId, blob, chunkIndex }) {
+    try {
+        const id = await db.chunks.add({
+            userId: userEmail,
+            blob: blob,
+            meetingId: meetingId,
+            uploaded: false,
+            timestamp: Date.now(),
+            chunkIndex: chunkIndex,
+            retries: 0
+        });
 
-
-export function appendBlob(blob, meetingId, userId, chunkIndex) {
-    const id = db.chunks.add({
-        userId: userId,
-        blob: blob,
-        meetingId: meetingId,
-        uploaded: false,
-        timestamp: Date.now(),
-        chunkIndex: chunkIndex,
-        retries: 0
-    })
-
-    console.log(`blob added to indexDB with id = ${id}`);
+        console.log(`✅ Chunk ${chunkIndex} added to IndexedDB with id = ${id}`);
+        return id;
+    } catch (error) {
+        console.error("Error adding chunk to IndexedDB:", error);
+        throw error;
+    }
 }
 
-export function uploadBlob() {
-    const count = db.chunks.where("uploaded").equals(false).count();
+export async function uploadBlob() {
+    // Prevent concurrent uploads
+    if (isUploading) {
+        console.log("Upload already in progress, skipping...");
+        return;
+    }
+
+    const count = await db.chunks.where("uploaded").equals(false).count();
     if (count > 0) {
-        console.log(`${count} chunks are pending`);
-        startUploading();
+        console.log(`📤 ${count} chunks pending upload`);
+        await startUploading();
+    } else {
+        console.log("No pending chunks to upload");
     }
 }
 
 export const startUploading = async () => {
-    const chunk = await db.chunks.where("uploaded").equals(false).first();
+    if (isUploading) return;
+    
+    isUploading = true;
+    
     try {
-        // upload chunk.blob to server with meetingId and userId
+        const chunk = await db.chunks.where("uploaded").equals(false).first();
         
+        if (!chunk) {
+            console.log("No pending chunks to upload");
+            isUploading = false;
+            return;
+        }
+        
+        // Check retry limit
         if (chunk.retries > 3) {
-            console.error(`chunk with id ${chunk.id} has failed to upload after 3 retries, deleting it from indexDB`);
+            console.error(`❌ Chunk ${chunk.chunkIndex} failed after 3 retries, deleting from IndexedDB`);
             await db.chunks.delete(chunk.id);
+            isUploading = false;
+            // Try next chunk
+            uploadBlob();
             return;
         }
 
-        const  { userId, blob, meetingId, chunkIndex } = chunk;
-        await cloudinary.uploader.upload(blob, {
-            resource_type: "video",
-            public_id: `recordings/${meetingId}/${userId}/chunk_${chunkIndex}`,
-            tags: [meetingId, userId]
-        });
-
-        chunk.upload = true;
-
+        const { userId, blob, meetingId, chunkIndex } = chunk;
+        
+        console.log(`⬆️ Uploading chunk ${chunkIndex} (size: ${blob.size} bytes)...`);
+        
+        // Create FormData for blob upload
+        const formData = new FormData();
+        formData.append("file", blob, `chunk-${chunkIndex}.webm`);
+        formData.append("userId", userId);
+        formData.append("chunkIndex", chunkIndex);
+        
+        const response = await axios.post(
+            `${import.meta.env.VITE_BACKEND_URL}/uploadChunk/${meetingId}`, 
+            formData, 
+            {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                },
+                timeout: 30000 // 30 second timeout
+            }
+        );
+        
+        console.log(`✅ Chunk ${chunkIndex} uploaded successfully:`, response.data);
+        
+        // Delete from IndexedDB after successful upload
         await db.chunks.delete(chunk.id);
-        console.log(`chunk with id ${chunk.id} uploaded and deleted from indexDB`);
-        return;
-    }
-
-    catch (error) {
-    chunk.retries += 1;
-    console.error("Error uploading chunk", error);
+        
+        isUploading = false;
+        
+        // Continue uploading next chunk
+        uploadBlob();
+        
+    } catch (error) {
+        console.error("❌ Error uploading chunk:", error);
+        
+        // Get the chunk again to update retries
+        const chunk = await db.chunks.where("uploaded").equals(false).first();
+        if (chunk) {
+            await db.chunks.update(chunk.id, { retries: chunk.retries + 1 });
+            console.log(`Retry count for chunk ${chunk.chunkIndex}: ${chunk.retries + 1}`);
+        }
+        
+        isUploading = false;
+        
+        // Retry after a delay
+        setTimeout(() => uploadBlob(), 2000);
     }
 }

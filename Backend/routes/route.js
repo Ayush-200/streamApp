@@ -11,6 +11,11 @@ import { uploadMeeting } from '../services/uploadMeeting.js';
 import { getUserMeetings } from '../services/getUserMeetings.js';
 import { addUserMeeting } from '../utils/addUserMeeting.js';
 import { addMeetingName } from '../utils/addMeetingName.js';
+import { uploadBlob } from '../utils/uploadBlob.js';
+import multer from 'multer';
+
+// Setup multer for memory storage
+const upload = multer({ storage: multer.memoryStorage() });
 
 const apiKey = process.env.API_KEY;
 const apiSecret = process.env.API_SECRET; 
@@ -42,5 +47,6 @@ router.get('/deleteMeetingName/:meetingName', deleteMeetingName);
 
 router.post('/removeMeetingFromSchedule/:emailId', removeMeetingFromSchedule);
 
+router.post('/uploadChunk/:meetingId', upload.single('file'), uploadBlob);
 
 export default router; 
