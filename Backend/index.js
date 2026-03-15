@@ -9,7 +9,7 @@ import { socketHandler } from './controller/socketController.js';
 
 dotenv.config();
 
-import router from './routes/route.js'; 
+import router from './routes/route.js';
 
 const app = express();
 const server = http.createServer(app);
