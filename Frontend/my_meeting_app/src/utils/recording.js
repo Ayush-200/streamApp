@@ -1,4 +1,4 @@
-import { appendBlob} from './appendBlob.js';
+import { appendBlob, uploadBlob } from './appendBlob.js';
 let mediaRecorder;
 let chunks = [];
 let currentStream = null;
@@ -42,16 +42,18 @@ export async function startRecording(meetingName, userEmail = null) {
       mediaRecorder.ondataavailable = async (e) => {
         chunkIndex++;
         if (e.data.size > 0) {
-          appendBlob({
+          console.log(`Chunk ${chunkIndex} received, size: ${e.data.size} bytes`);
+          await appendBlob({
             userEmail: userEmail, 
             meetingId: meetingName,
             blob: e.data, 
             chunkIndex: chunkIndex
-          })
+          });
+          
+          // Trigger upload immediately after saving to IndexedDB
+          uploadBlob();
         }
       };
-
-      mediaRecorder.start(2000);
 
       mediaRecorder.onerror = (event) => {
         console.error("MediaRecorder error:", event.error);
@@ -60,7 +62,7 @@ export async function startRecording(meetingName, userEmail = null) {
       // Setup cleanup handlers for page unload
       setupCleanupHandlers(meetingName);
 
-      mediaRecorder.start(2000); // collect data every 1s
+      mediaRecorder.start(2000); // collect data every 2s
       
       console.log("Recording started.");
     } catch (err) {

@@ -18,7 +18,12 @@ const ParticipantSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   joinTime: { type: Date, required: true },
   leaveTime: { type: Date }, // can be null until they leave
-  videoPublicId: { type: String } // filled after upload
+  videoPublicId: { type: String }, // filled after upload
+  chunks: [{
+    chunkIndex: Number,
+    cloudinaryUrl: String,
+    uploadTime: Date
+  }]
 });
 
 const meetingParticipantSchema = new mongoose.Schema({
