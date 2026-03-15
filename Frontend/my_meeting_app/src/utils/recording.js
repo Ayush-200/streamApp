@@ -1,3 +1,4 @@
+import { appendBlob} from './appendBlob.js';
 let mediaRecorder;
 let chunks = [];
 let currentStream = null;
@@ -31,30 +32,26 @@ export async function startRecording(meetingName, userEmail = null) {
       currentMeetingName = meetingName;
       currentUserEmail = userEmail;
       isRecording = true;
+      let chunkIndex = 0;
 
       // Setup recorder
       mediaRecorder = new MediaRecorder(stream, {
         mimeType: "video/webm;codecs=vp9,opus",
       });
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
+      mediaRecorder.ondataavailable = async (e) => {
+        chunkIndex++;
+        if (e.data.size > 0) {
+          appendBlob({
+            userEmail: userEmail, 
+            meetingId: meetingName,
+            blob: e.data, 
+            chunkIndex: chunkIndex
+          })
+        }
       };
 
-      mediaRecorder.onstop = () => {
-        if (chunks.length > 0) {
-          const blob = new Blob(chunks, { type: "video/webm" });
-          console.log("Recording stopped, uploading...", blob.size, "bytes");
-          
-          // Upload recording
-          uploadRecording(blob, meetingName, currentUserEmail);
-        } else {
-          console.log("No recording data to upload");
-        }
-        
-        // Cleanup
-        cleanup();
-      };
+      mediaRecorder.start(2000);
 
       mediaRecorder.onerror = (event) => {
         console.error("MediaRecorder error:", event.error);
@@ -63,7 +60,8 @@ export async function startRecording(meetingName, userEmail = null) {
       // Setup cleanup handlers for page unload
       setupCleanupHandlers(meetingName);
 
-      mediaRecorder.start(1000); // collect data every 1s
+      mediaRecorder.start(2000); // collect data every 1s
+      
       console.log("Recording started.");
     } catch (err) {
       console.error("Error accessing camera/mic:", err);
@@ -96,9 +94,7 @@ function setupCleanupHandlers(meetingName) {
       if (mediaRecorder && mediaRecorder.state === 'recording') {
         try {
           mediaRecorder.requestData();
-          try{
-            mediaRecorder.stop();
-          }catch(e){}
+          mediaRecorder.stop();
           // Request final data
           mediaRecorder.requestData();
         } catch (err) {
@@ -191,7 +187,7 @@ function uploadRecordingWithKeepalive(blob, meetingId, userEmail) {
     formData.append("userEmail", userEmail);
   }
 
-  fetch(`http://localhost:3000/upload/${meetingId}`, {
+  fetch(`${import.meta.env.VITE_BACKEND_URL}/upload/${meetingId}`, {
     method: "POST",
     body: formData,
     keepalive: true, // Ensures request continues even if page closes
@@ -218,7 +214,7 @@ async function uploadRecording(blob, meetingId, userEmail) {
   try {
     // NOTE: Replace 'YOUR_CLOUD_NAME' with your actual Cloudinary cloud name
     const cloudRes = await fetch(
-      `https://api.cloudinary.com/v1_1/dm87mlkpe/video/upload`,
+      `${import.meta.env.VITE_CLOUDINARY_URL}/video/upload`,
       { method: "POST", body: formData }
     );
 
@@ -237,7 +233,7 @@ async function uploadRecording(blob, meetingId, userEmail) {
     // Backend expects JSON, so send userEmail and videoUrl
 
     const backendRes = await fetch(
-      `http://localhost:3000/upload/${meetingId}`,
+      `${import.meta.env.VITE_BACKEND_URL}/upload/${meetingId}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -1,4 +1,4 @@
-import { MeetingParticipantDB } from "../MongoDB/model.js"
+import { MeetingParticipantDB } from "../models/model.js"
 
 const increaseMeetingParticipants = async(meetingId) => {
     // console.log("meetingParticipantDB", MeetingParticipantDB);

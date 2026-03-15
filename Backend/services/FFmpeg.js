@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import { MeetingParticipantDB } from "../MongoDB/model.js";
+import { MeetingParticipantDB } from "../models/model.js";
 dotenv.config();
 export async function mergeAndDownloadVideo(meetingId) {
   console.log("inside merge and donwload");

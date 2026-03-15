@@ -1,4 +1,4 @@
-import { MeetingDB } from '../MongoDB/model.js'
+import { MeetingDB } from '../models/model.js'
 
 export const getAlreadyCreatedMeeting = (async (req, res)=>{
     const meetingName = req.params.meetingName;

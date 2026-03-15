@@ -1,6 +1,6 @@
 import { mergeAndDownloadVideo } from "../services/FFmpeg.js";
-import { MeetingDB } from "../MongoDB/model.js";
-import { MeetingParticipantDB } from "../MongoDB/model.js";
+import { MeetingDB, MeetingParticipantDB } from "../models/model.js";
+import { addJobToQueue } from "../services/queueService.js";
 let current_meeting_id = null;
 export function socketHandler(io) {
         io.on("connection", (socket) => {
@@ -49,7 +49,6 @@ export function socketHandler(io) {
         socket.on("start_recording", (meetingId) => {
             console.log("tello")
             console.log("start_recording from:", socket.id);
-
             io.to(meetingId).emit("start_recording");
 
         });
@@ -63,6 +62,7 @@ export function socketHandler(io) {
 
         socket.on("stop_recording", async (meetingId) => {
             console.log("stop_recording from:", socket.id);
+            await addJobToQueue(meetingId);
             io.to(meetingId).emit("stop_recording");
 
         });
@@ -74,7 +74,6 @@ export function socketHandler(io) {
         })
 
         socket.on("disconnect", () => {
-
             console.log("socket disconnected:", socket.id);
             if (current_meeting_id) {
                 updateParticipantCount(current_meeting_id, io);
@@ -84,26 +83,3 @@ export function socketHandler(io) {
 
 }
 
-
-async function updateParticipantCount(meetingId, io){
-    const room = io.sockets.adapter.rooms.get(meetingId);
-    const participantCount = room ? room.size : 0;
-
-    // Persist the current count to DB (upsert if needed)
-    await MeetingParticipantDB.findOneAndUpdate(
-        { meetingId: meetingId },
-        { $set: { participantCount } },
-        { new: true, upsert: true }
-    );
-
-    // ✅ Send count to all participants in this room
-    io.to(meetingId).emit("participant_count", participantCount);
-    console.log("here number of participants is", participantCount);
-
-    if (participantCount === 0) {
-        await MeetingDB.deleteOne({ meetingName: meetingId });
-        mergeAndDownloadVideo(meetingId);
-        console.log("Meeting deleted because no participants left");
-    }
-
-}

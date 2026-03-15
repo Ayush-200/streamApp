@@ -1,4 +1,4 @@
-import { MeetingDB } from '../MongoDB/model.js'
+import { MeetingDB } from '../models/model.js'
 
 
 export const addMeetingName = (async(req, res)=>{
