@@ -4,13 +4,13 @@ dotenv.config();
 import { StreamClient  } from "@stream-io/node-sdk";
 const router = express.Router();
 
-import { getAlreadyCreatedMeeting } from '../services/getAlreadyCreatedMeeting.js';
-import { deleteMeetingName } from '../services/deleteMeetingName.js';
-import { removeMeetingFromSchedule } from '../services/removeMeetingFromSchedule.js';
+import { getAlreadyCreatedMeeting } from '../utils/getAlreadyCreatedMeeting.js';
+import { deleteMeetingName } from '../utils/deleteMeetingName.js';
+import { removeMeetingFromSchedule } from '../utils/removeMeetingFromSchedule.js';
 import { uploadMeeting } from '../services/uploadMeeting.js';
 import { getUserMeetings } from '../services/getUserMeetings.js';
-import { addUserMeeting } from '../services/addUserMeeting.js';
-import { addMeetingName } from '../services/addMeetingName.js';
+import { addUserMeeting } from '../utils/addUserMeeting.js';
+import { addMeetingName } from '../utils/addMeetingName.js';
 
 const apiKey = process.env.API_KEY;
 const apiSecret = process.env.API_SECRET; 

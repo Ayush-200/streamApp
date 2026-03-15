@@ -2,10 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import http from 'http';
-import connectDB from './MongoDB/db.js';
+import connectDB from './config/db.js';
 import { Server } from 'socket.io';
 import { v2 as cloudinary } from 'cloudinary';
-import { socketHandler } from './controller/socketHandler.js';
+import { socketHandler } from './controller/socketController.js';
 
 dotenv.config();
 
@@ -23,13 +23,6 @@ cloudinary.config({
   secure: true
 });
 
-// Middleware
-// app.use(cors({
-//   origin: "https://streamapp-webapp.onrender.com",
-//   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-//   allowedHeaders: ["Content-Type", "Authorization"],
-//   credentials: true
-// }));
 
 // app.options("*", cors());
 app.use(cors());

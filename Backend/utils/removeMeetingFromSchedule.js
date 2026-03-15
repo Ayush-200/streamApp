@@ -1,4 +1,4 @@
-import { User } from '../MongoDB/model.js'
+import { User } from '../models/model.js'
 
 export const removeMeetingFromSchedule = (async (req, res) =>{
     const email = req.params.emailId;

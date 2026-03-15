@@ -1,4 +1,4 @@
-import { MeetingParticipantDB } from '../MongoDB/model.js'
+import { MeetingParticipantDB } from '../models/model.js'
 import multer from 'multer';
 import axios from 'axios';
 
