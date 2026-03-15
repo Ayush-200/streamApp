@@ -13,9 +13,9 @@
 
   import { useEffect, useState } from "react";
   import { useParams } from "react-router-dom";
-  import  socket  from './socket.js';
+  import  socket  from './utils/socket.js';
   import { useAuth0 } from "@auth0/auth0-react";
-  import {startRecording, stopRecording, cleanupRecording, isRecordingActive } from './recording.js';
+  import {startRecording, stopRecording, cleanupRecording, isRecordingActive } from './utils/recording.js';
   const apiKey = "55gcbd3wd3nk";
 
   const MeetingUI = ({ showParticipantList, setShowParticipantList, join, setJoin }) => {
