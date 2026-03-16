@@ -21,9 +21,11 @@ export const uploadBlob = async (req, res) => {
             const uploadStream = cloudinary.uploader.upload_stream(
                 {
                     resource_type: "video",
+                    format: "webm", // Explicitly specify format
                     public_id: `recordings/${meetingId}/${userId}/chunk_${chunkIndex}`,
                     tags: [meetingId, userId],
-                    folder: `meeting_recordings/${meetingId}`
+                    folder: `meeting_recordings/${meetingId}`,
+                    chunk_size: 6000000 // 6MB chunks for large files
                 },
                 (error, result) => {
                     if (error) {
@@ -36,6 +38,7 @@ export const uploadBlob = async (req, res) => {
                 }
             );
             
+            // Write the buffer to the stream
             uploadStream.end(blob.buffer);
         });
 
