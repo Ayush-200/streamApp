@@ -116,7 +116,7 @@ const Home = ({ setJoin }) => {
        <div className="flex gap-4 overflow-x-auto h-[90px]">
   {meetings.length > 0 ? (
     meetings.map((m, i) => (
-      <div onClick={() =>window.location.href=`${import.meta.env.VITE_APP_BASE_URL}/meeting/${m.meeting}`}
+      <div onClick={() =>window.location.href=`${import.meta.env.VITE_BACKEND_URL}/meeting/${m.meeting}`}
         key={i}
         className="flex flex-col justify-center min-w-[200px] p-4 bg-slate-700 rounded-lg text-white shadow-md hover:bg-[#EA2264]"
       >

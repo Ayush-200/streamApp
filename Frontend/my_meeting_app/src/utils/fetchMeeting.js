@@ -1,5 +1,5 @@
 const fetchMeetings = async(emailId) => {
-    const response = await fetch(`${import.meta.env.BACKEND_URL}/getUserMeetings/${emailId}`);
+    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/getUserMeetings/${emailId}`);
     const data = await response.json();
     console.log("data ")
     console.log(data);
