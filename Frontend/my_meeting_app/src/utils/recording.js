@@ -160,14 +160,16 @@ async function uploadSegment(meetingId, userEmail, segmentIndex) {
     const chunks = await db.chunks
       .where('segmentIndex')
       .equals(segmentIndex)
+      .and(chunk => chunk.meetingId === meetingId)
       .sortBy('chunkIndex');
     
     if (chunks.length === 0) {
-      console.log("No chunks to upload for segment", segmentIndex);
-      return true;
+      console.log(`⚠️ No chunks to upload for segment ${segmentIndex}`);
+      return true; // Consider it success if no chunks
     }
     
     console.log(`📦 Merging ${chunks.length} chunks for segment ${segmentIndex}...`);
+    console.log(`Chunk IDs:`, chunks.map(c => c.id));
     
     // Merge all blobs
     const blobs = chunks.map(c => c.blob);
@@ -179,7 +181,7 @@ async function uploadSegment(meetingId, userEmail, segmentIndex) {
     const formData = new FormData();
     formData.append("file", mergedBlob, `segment-${segmentIndex}.webm`);
     formData.append("userId", userEmail);
-    formData.append("segmentIndex", segmentIndex);
+    formData.append("chunkIndex", segmentIndex); // Backend expects chunkIndex parameter
     
     const response = await fetch(
       `${import.meta.env.VITE_BACKEND_URL}/uploadSegment/${meetingId}`,
@@ -190,18 +192,26 @@ async function uploadSegment(meetingId, userEmail, segmentIndex) {
     );
     
     if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Upload failed: ${response.statusText} - ${errorText}`);
     }
     
     const result = await response.json();
     console.log(`✅ Segment ${segmentIndex} uploaded:`, result);
     
-    // Delete chunks from IndexedDB
+    // Delete chunks from IndexedDB only after successful upload
+    console.log(`🗑️ Deleting ${chunks.length} chunks from IndexedDB...`);
     for (const chunk of chunks) {
       await db.chunks.delete(chunk.id);
+      console.log(`  Deleted chunk ${chunk.id}`);
     }
     
-    console.log(`🗑️ Deleted ${chunks.length} chunks from IndexedDB`);
+    // Verify deletion
+    const remainingChunks = await db.chunks
+      .where('segmentIndex')
+      .equals(segmentIndex)
+      .count();
+    console.log(`✅ Chunks deleted. Remaining chunks for segment ${segmentIndex}: ${remainingChunks}`);
     
     return true;
   } catch (error) {
