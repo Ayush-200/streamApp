@@ -9,7 +9,7 @@ export async function appendBlob({ userEmail, meetingId, blob, chunkIndex }) {
             userId: userEmail,
             blob: blob,
             meetingId: meetingId,
-            uploaded: false,
+            status: 0, // 0 = pending, 1 = uploaded
             timestamp: Date.now(),
             chunkIndex: chunkIndex,
             retries: 0
@@ -30,7 +30,7 @@ export async function uploadBlob() {
         return;
     }
 
-    const count = await db.chunks.where("uploaded").equals(false).count();
+    const count = await db.chunks.where("status").equals(0).count();
     if (count > 0) {
         console.log(`📤 ${count} chunks pending upload`);
         await startUploading();
@@ -45,7 +45,7 @@ export const startUploading = async () => {
     isUploading = true;
     
     try {
-        const chunk = await db.chunks.where("uploaded").equals(false).first();
+        const chunk = await db.chunks.where("status").equals(0).first();
         
         if (!chunk) {
             console.log("No pending chunks to upload");
@@ -98,7 +98,7 @@ export const startUploading = async () => {
         console.error("❌ Error uploading chunk:", error);
         
         // Get the chunk again to update retries
-        const chunk = await db.chunks.where("uploaded").equals(false).first();
+        const chunk = await db.chunks.where("status").equals(0).first();
         if (chunk) {
             await db.chunks.update(chunk.id, { retries: chunk.retries + 1 });
             console.log(`Retry count for chunk ${chunk.chunkIndex}: ${chunk.retries + 1}`);
