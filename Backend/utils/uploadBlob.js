@@ -29,6 +29,6 @@ export const uploadBlob = async (req, res) => {
         res.json({ success: true, url: result.secure_url });
     } catch (err) {
         console.error(`Error occurred in uploading video: ${err}`);
-        res.status(500).json({ error: `Error occurred in uploading video: ${err.message}` });
+        res.status(500).json({ error: `Error occurred in uploading video: ${err}` });
     }
 }
