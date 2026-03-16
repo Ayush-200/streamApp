@@ -49,4 +49,6 @@ router.post('/removeMeetingFromSchedule/:emailId', removeMeetingFromSchedule);
 
 router.post('/uploadChunk/:meetingId', upload.single('file'), uploadBlob);
 
+router.post('/uploadSegment/:meetingId', upload.single('file'), uploadBlob); // Reuse uploadBlob handler
+
 export default router; 
