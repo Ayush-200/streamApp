@@ -65,13 +65,18 @@ export const startUploading = async () => {
 
         const { userId, blob, meetingId, chunkIndex } = chunk;
         
-        console.log(`⬆️ Uploading chunk ${chunkIndex} (size: ${blob.size} bytes)...`);
+        console.log(`⬆️ Uploading chunk ${chunkIndex} (size: ${blob.size} bytes, type: ${blob.type})...`);
+        
+        // Create a new Blob with correct MIME type if needed
+        const videoBlob = blob.type === 'video/webm' ? blob : new Blob([blob], { type: 'video/webm' });
         
         // Create FormData for blob upload
         const formData = new FormData();
-        formData.append("file", blob, `chunk-${chunkIndex}.webm`);
+        formData.append("file", videoBlob, `chunk-${chunkIndex}.webm`);
         formData.append("userId", userId);
         formData.append("chunkIndex", chunkIndex);
+        
+        console.log(`📤 Sending chunk ${chunkIndex} with type: ${videoBlob.type}`);
         
         const response = await axios.post(
             `${import.meta.env.VITE_BACKEND_URL}/uploadChunk/${meetingId}`, 
