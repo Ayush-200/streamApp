@@ -5,42 +5,104 @@ let currentStream = null;
 let isRecording = false;
 let currentMeetingName = null;
 let currentUserEmail = null;
-let cleanupHandlers = [];
 let uploadInterval = null;
 let chunkCounter = 0;
 let segmentCounter = 0;
-let isUploading = false; // Prevent concurrent uploads
+let isUploading = false;
 
-// Track recording state
 export function isRecordingActive() {
   return isRecording && mediaRecorder && mediaRecorder.state === 'recording';
 }
 
-// Get current meeting name
 export function getCurrentMeetingName() {
   return currentMeetingName;
 }
 
-// Upload the oldest segment from IndexedDB
+export async function startRecording(meetingName, userEmail = null) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    console.log("getUserMedia not supported!");
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      video: true,
+      audio: true,
+    });
+
+    currentStream = stream;
+    currentMeetingName = meetingName;
+    currentUserEmail = userEmail;
+    isRecording = true;
+    chunkCounter = 0;
+    segmentCounter = 0;
+
+    mediaRecorder = new MediaRecorder(stream, {
+      mimeType: "video/webm;codecs=vp9,opus",
+    });
+
+    mediaRecorder.ondataavailable = async (e) => {
+      if (e.data.size > 0) {
+        chunkCounter++;
+        console.log(`Chunk ${chunkCounter} (segment ${segmentCounter}), size: ${e.data.size} bytes`);
+        await appendBlob({
+          userEmail: userEmail, 
+          meetingId: meetingName,
+          blob: e.data, 
+          chunkIndex: chunkCounter,
+          segmentIndex: segmentCounter
+        });
+      }
+    };
+
+    mediaRecorder.onerror = (event) => {
+      console.error("MediaRecorder error:", event.error);
+    };
+
+    mediaRecorder.start(2000); // Collect data every 2s
+    
+    // Start upload interval
+    startUploadInterval(meetingName, userEmail);
+    
+    console.log("Recording started.");
+  } catch (err) {
+    console.error("Error accessing camera/mic:", err);
+    isRecording = false;
+  }
+}
+
+function startUploadInterval(meetingName, userEmail) {
+  uploadInterval = setInterval(async () => {
+    console.log("⏰ 60 seconds elapsed - moving to next segment...");
+    
+    // Move to next segment (don't stop recording)
+    segmentCounter++;
+    chunkCounter = 0;
+    
+    // Upload oldest segment if not already uploading
+    if (!isUploading) {
+      uploadOldestSegment(meetingName, userEmail);
+    }
+  }, 60000);
+}
+
 async function uploadOldestSegment(meetingId, userEmail) {
   if (isUploading) {
     console.log("⚠️ Upload already in progress, skipping...");
     return;
   }
   
+  if (!navigator.onLine) {
+    console.log("❌ No internet connection");
+    return;
+  }
+  
   isUploading = true;
   
   try {
-    // Check network connectivity
-    if (!navigator.onLine) {
-      console.log("❌ No internet connection, upload skipped");
-      isUploading = false;
-      return;
-    }
-    
     const { db } = await import('../db/db.js');
     
-    // Get the oldest segment that has chunks
+    // Get all chunks
     const allChunks = await db.chunks
       .where('meetingId')
       .equals(meetingId)
@@ -48,34 +110,33 @@ async function uploadOldestSegment(meetingId, userEmail) {
     
     if (allChunks.length === 0) {
       console.log("✅ No chunks to upload");
-      isUploading = false;
       return;
     }
     
-    // Find the oldest segment
+    // Find oldest segment
     const oldestSegmentIndex = Math.min(...allChunks.map(c => c.segmentIndex));
     
-    // Get all chunks for the oldest segment
+    // Get chunks for oldest segment, sorted by chunkIndex
     const chunks = allChunks
       .filter(c => c.segmentIndex === oldestSegmentIndex)
       .sort((a, b) => a.chunkIndex - b.chunkIndex);
     
-    console.log(`📦 Uploading oldest segment ${oldestSegmentIndex} with ${chunks.length} chunks...`);
+    console.log(`📦 Uploading segment ${oldestSegmentIndex} with ${chunks.length} chunks`);
     
-    // Merge all blobs
+    // Merge blobs
     const blobs = chunks.map(c => c.blob);
     const mergedBlob = new Blob(blobs, { type: 'video/webm' });
     
-    console.log(`📤 Uploading segment ${oldestSegmentIndex} (${mergedBlob.size} bytes)...`);
+    console.log(`📤 Uploading ${mergedBlob.size} bytes...`);
     
-    // Upload to Cloudinary with timeout
+    // Upload
     const formData = new FormData();
     formData.append("file", mergedBlob, `segment-${oldestSegmentIndex}.webm`);
     formData.append("userId", userEmail);
     formData.append("chunkIndex", oldestSegmentIndex);
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
     
     const response = await fetch(
       `${import.meta.env.VITE_BACKEND_URL}/uploadSegment/${meetingId}`,
@@ -89,164 +150,26 @@ async function uploadOldestSegment(meetingId, userEmail) {
     clearTimeout(timeoutId);
     
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Upload failed: ${response.statusText} - ${errorText}`);
+      throw new Error(`Upload failed: ${response.statusText}`);
     }
     
-    const result = await response.json();
-    console.log(`✅ Segment ${oldestSegmentIndex} uploaded successfully:`, result);
+    console.log(`✅ Segment ${oldestSegmentIndex} uploaded successfully`);
     
-    // Delete chunks from IndexedDB ONLY after successful upload
-    console.log(`🗑️ Deleting ${chunks.length} chunks from IndexedDB...`);
+    // Delete chunks only after successful upload
     for (const chunk of chunks) {
       await db.chunks.delete(chunk.id);
     }
     
-    console.log(`✅ Segment ${oldestSegmentIndex} deleted from IndexedDB`);
+    console.log(`🗑️ Deleted ${chunks.length} chunks from IndexedDB`);
     
   } catch (error) {
-    console.error(`❌ Error uploading segment:`, error);
+    console.error(`❌ Upload error:`, error);
   } finally {
     isUploading = false;
   }
 }
 
-export async function startRecording(meetingName, userEmail = null) {
-  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    console.log("getUserMedia supported.");
-
-    try {
-      // Capture both video and audio
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true,
-        audio: true,
-      });
-
-      currentStream = stream;
-      currentMeetingName = meetingName;
-      currentUserEmail = userEmail;
-      isRecording = true;
-      chunkCounter = 0;
-      segmentCounter = 0;
-
-      // Setup recorder
-      mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "video/webm;codecs=vp9,opus",
-      });
-
-      mediaRecorder.ondataavailable = async (e) => {
-        chunkCounter++;
-        if (e.data.size > 0) {
-          console.log(`Chunk ${chunkCounter} received, size: ${e.data.size} bytes`);
-          await appendBlob({
-            userEmail: userEmail, 
-            meetingId: meetingName,
-            blob: e.data, 
-            chunkIndex: chunkCounter,
-            segmentIndex: segmentCounter
-          });
-        }
-      };
-
-      mediaRecorder.onerror = (event) => {
-        console.error("MediaRecorder error:", event.error);
-      };
-
-      // Setup cleanup handlers for page unload
-      setupCleanupHandlers(meetingName);
-
-      mediaRecorder.start(2000); // collect data every 2s
-      
-      // Start 60-second upload interval
-      startUploadInterval(meetingName, userEmail);
-      
-      console.log("Recording started.");
-    } catch (err) {
-      console.error("Error accessing camera/mic:", err);
-      isRecording = false;
-    }
-  } else {
-    console.log("getUserMedia not supported!");
-  }
-}
-
-// Upload every 60 seconds
-function startUploadInterval(meetingName, userEmail) {
-  uploadInterval = setInterval(async () => {
-    console.log("⏰ 60 seconds elapsed - checking for segments to upload...");
-    
-    // Skip if already uploading
-    if (isUploading) {
-      console.log("⚠️ Upload already in progress, skipping this interval...");
-      return;
-    }
-    
-    // Stop current recording temporarily to finalize current segment
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      // Request final data before stopping
-      mediaRecorder.requestData();
-      
-      // Wait for the final chunk to be processed
-      await new Promise(resolve => {
-        const originalHandler = mediaRecorder.ondataavailable;
-        let finalChunkReceived = false;
-        
-        mediaRecorder.ondataavailable = async (e) => {
-          if (!finalChunkReceived) {
-            finalChunkReceived = true;
-            await originalHandler(e);
-            resolve();
-          }
-        };
-        
-        mediaRecorder.stop();
-        
-        // Fallback timeout
-        setTimeout(resolve, 1000);
-      });
-      
-      // Additional wait to ensure IndexedDB write completes
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Move to next segment for new recordings
-      segmentCounter++;
-      chunkCounter = 0;
-      
-      // Upload the oldest segment (not necessarily the one we just finished)
-      await uploadOldestSegment(meetingName, userEmail);
-      
-      // Restart recording with new segment
-      if (currentStream && isRecording) {
-        mediaRecorder = new MediaRecorder(currentStream, {
-          mimeType: "video/webm;codecs=vp9,opus",
-        });
-        
-        mediaRecorder.ondataavailable = async (e) => {
-          chunkCounter++;
-          if (e.data.size > 0) {
-            console.log(`Chunk ${chunkCounter} received, size: ${e.data.size} bytes`);
-            await appendBlob({
-              userEmail: userEmail, 
-              meetingId: meetingName,
-              blob: e.data, 
-              chunkIndex: chunkCounter,
-              segmentIndex: segmentCounter
-            });
-          }
-        };
-        
-        mediaRecorder.onerror = (event) => {
-          console.error("MediaRecorder error:", event.error);
-        };
-        
-        mediaRecorder.start(2000);
-      }
-    }
-  }, 60000); // 60 seconds
-}
-
-
-export function stopRecording(meetingName) {
+export function stopRecording() {
   if (uploadInterval) {
     clearInterval(uploadInterval);
     uploadInterval = null;
@@ -254,182 +177,17 @@ export function stopRecording(meetingName) {
   
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop();
-    console.log("Recording stopped manually.");
+    console.log("Recording stopped.");
   }
-}
-
-// Setup event handlers for page unload/close
-function setupCleanupHandlers(meetingName) {
-  // Remove existing handlers
-  cleanupHandlers.forEach(({ event, handler, target }) => {
-    target.removeEventListener(event, handler);
-  });
-  cleanupHandlers = [];
-
-  // Handler for page unload (user closes tab/browser)
-  const handleBeforeUnload = (e) => {
-    if (isRecordingActive()) {
-      // Stop recording before page unloads
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        try {
-          mediaRecorder.requestData();
-          mediaRecorder.stop();
-          // Request final data
-          mediaRecorder.requestData();
-        } catch (err) {
-          console.error("Error stopping recorder on unload:", err);
-        }
-      }
-      
-      // Upload using fetch with keepalive (more reliable than sendBeacon for FormData)
-      if (chunks.length > 0) {
-        const blob = new Blob(chunks, { type: "video/webm" });
-        uploadRecordingWithKeepalive(blob, meetingName, currentUserEmail);
-      }
-    }
-  };
-
-  // Handler for visibility change (tab switch, minimize)
-  const handleVisibilityChange = () => {
-    if (document.hidden && isRecordingActive()) {
-      // Tab is hidden, but keep recording
-      // We'll upload when they come back or leave
-      console.log("Tab hidden, recording continues...");
-    }
-  };
-
-  // Handler for pagehide (more reliable than beforeunload)
-  const handlePageHide = (e) => {
-    if (isRecordingActive()) {
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        mediaRecorder.requestData();
-      }
-      
-      // Upload using keepalive
-      if (chunks.length > 0) {
-        const blob = new Blob(chunks, { type: "video/webm" });
-        uploadRecordingWithKeepalive(blob, meetingName, currentUserEmail);
-      }
-    }
-  };
-
-  // Add event listeners
-  window.addEventListener('beforeunload', handleBeforeUnload);
-  window.addEventListener('pagehide', handlePageHide);
-  document.addEventListener('visibilitychange', handleVisibilityChange);
-
-  cleanupHandlers = [
-    { event: 'beforeunload', handler: handleBeforeUnload, target: "window" },
-    { event: 'pagehide', handler: handlePageHide, target: "window" },
-    { event: 'visibilitychange', handler: handleVisibilityChange, target: "document" }
-  ];
-}
-
-// Cleanup function
-function cleanup() {
-  // Stop all tracks
-  if (currentStream) {
-    currentStream.getTracks().forEach(track => {
-      track.stop();
-    });
-    currentStream = null;
-  }
-
-  // Clear chunks
-  chunks = [];
+  
   isRecording = false;
-  currentMeetingName = null;
-  currentUserEmail = null;
-
-  // Remove event listeners
-  cleanupHandlers.forEach(({ event, handler }) => {
-    window.removeEventListener(event, handler);
-    document.removeEventListener(event, handler);
-  });
-  cleanupHandlers = [];
 }
 
-// Export cleanup function for manual cleanup
 export function cleanupRecording() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
-  }
-  cleanup();
-}
-
-// Upload with keepalive (for page unload scenarios)
-function uploadRecordingWithKeepalive(blob, meetingId, userEmail) {
-  const formData = new FormData();
-  formData.append("file", blob, `user-${Date.now()}.webm`);
-  if (userEmail) {
-    formData.append("userEmail", userEmail);
-  }
-
-  fetch(`${import.meta.env.VITE_BACKEND_URL}/upload/${meetingId}`, {
-    method: "POST",
-    body: formData,
-    keepalive: true, // Ensures request continues even if page closes
-  })
-  .then((res) => {
-    console.log("Uploaded on page unload:", res);
-  })
-  .catch((err) => {
-    console.error("Upload failed on page unload:", err);
-  });
-}
-
-async function uploadRecording(blob, meetingId, userEmail) {
-  console.log("inside upload function");
-  console.log("userEMail", userEmail);
-    
-
-  // --- Step 1: Upload to Cloudinary ---
-  const formData = new FormData();
-  formData.append("file", blob, `user-${Date.now()}.webm`);
-  formData.append("upload_preset", "THIS_IS_MY_PRESET"); // Cloudinary unsigned preset
-  formData.append("folder", `meeting_recordings/${meetingId}`); // optional folder
-
-  try {
-    // NOTE: Replace 'YOUR_CLOUD_NAME' with your actual Cloudinary cloud name
-    const cloudRes = await fetch(
-      `${import.meta.env.VITE_CLOUDINARY_URL}/video/upload`,
-      { method: "POST", body: formData }
-    );
-
-    
-    const cloudData = await cloudRes.json();
-    console.log("videoUrl", cloudData);
-
-    if (!cloudData.secure_url) {
-      console.error("Cloudinary upload failed:", cloudData);
-      throw new Error("Cloudinary upload failed");
-    }
-
-    console.log("Uploaded to Cloudinary:", cloudData.secure_url);
-
-    // --- Step 2: Notify backend ---
-    // Backend expects JSON, so send userEmail and videoUrl
-
-    const backendRes = await fetch(
-      `${import.meta.env.VITE_BACKEND_URL}/upload/${meetingId}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: userEmail,       // your participant's email
-          videoPublicId: cloudData.secure_url // Cloudinary video URL
-        })
-      }
-    );
-
-    const backendData = await backendRes.json();
-    console.log("Backend response:", backendData);
-
-    return cloudData.secure_url; // return Cloudinary URL for further use
-
-  } catch (err) {
-    console.error("Upload failed:", err.message);
-    throw err;
+  stopRecording();
+  
+  if (currentStream) {
+    currentStream.getTracks().forEach(track => track.stop());
+    currentStream = null;
   }
 }
