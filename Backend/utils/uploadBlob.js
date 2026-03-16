@@ -42,11 +42,22 @@ export const uploadBlob = async (req, res) => {
         console.log(`✅ Upload successful - URL: ${result.secure_url}`);
         res.json({ success: true, url: result.secure_url, chunkIndex });
     } catch (err) {
-        console.error(`❌ Error in uploadBlob:`, err);
-        const errorMessage = err.message || err.error?.message || JSON.stringify(err);
+        console.error(`❌ Error in uploadBlob:`);
+        console.error('Error type:', typeof err);
+        console.error('Error keys:', Object.keys(err));
+        console.error('Full error:', JSON.stringify(err, null, 2));
+        console.error('Error message:', err.message);
+        console.error('Error stack:', err.stack);
+        
+        const errorMessage = err.message || err.error?.message || 'Unknown error';
         res.status(500).json({ 
             error: `Error occurred in uploading video: ${errorMessage}`,
-            details: err.error || err
+            errorType: err.name || 'Error',
+            details: {
+                message: err.message,
+                http_code: err.http_code,
+                error: err.error
+            }
         });
     }
 }
