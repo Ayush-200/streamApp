@@ -73,15 +73,54 @@ export async function startRecording(meetingName, userEmail = null) {
 
 function startUploadInterval(meetingName, userEmail) {
   uploadInterval = setInterval(async () => {
-    console.log("⏰ 60 seconds elapsed - moving to next segment...");
+    console.log("⏰ 60 seconds elapsed - finalizing segment and starting new one...");
     
-    // Move to next segment (don't stop recording)
-    segmentCounter++;
-    chunkCounter = 0;
-    
-    // Upload oldest segment if not already uploading
-    if (!isUploading) {
-      uploadOldestSegment(meetingName, userEmail);
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      // Request final data to ensure we get the last chunk
+      mediaRecorder.requestData();
+      
+      // Stop to finalize the segment (adds proper end markers)
+      mediaRecorder.stop();
+      
+      // Wait for ondataavailable to process the final chunk
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Move to next segment
+      segmentCounter++;
+      chunkCounter = 0;
+      
+      // Upload oldest segment in background
+      if (!isUploading) {
+        uploadOldestSegment(meetingName, userEmail);
+      }
+      
+      // Restart MediaRecorder for new segment (gets new headers)
+      if (currentStream && isRecording) {
+        mediaRecorder = new MediaRecorder(currentStream, {
+          mimeType: "video/webm;codecs=vp9,opus",
+        });
+
+        mediaRecorder.ondataavailable = async (e) => {
+          if (e.data.size > 0) {
+            chunkCounter++;
+            console.log(`Chunk ${chunkCounter} (segment ${segmentCounter}), size: ${e.data.size} bytes`);
+            await appendBlob({
+              userEmail: userEmail, 
+              meetingId: meetingName,
+              blob: e.data, 
+              chunkIndex: chunkCounter,
+              segmentIndex: segmentCounter
+            });
+          }
+        };
+
+        mediaRecorder.onerror = (event) => {
+          console.error("MediaRecorder error:", event.error);
+        };
+
+        mediaRecorder.start(2000);
+        console.log(`✅ Started recording segment ${segmentCounter}`);
+      }
     }
   }, 60000);
 }
