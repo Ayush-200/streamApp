@@ -1,9 +1,9 @@
 import { io } from "socket.io-client";
 
-const socket = io(`${import.meta.env.VITE_BACKEND_URL}`, {
+const socket = io("https://streamapp-uyjv.onrender.com", {
   transports: ["websocket"],
-  withCredentials: true,
-  autoConnect: true,
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 2000,
 });
-
 export default socket;
