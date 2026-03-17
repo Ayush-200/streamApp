@@ -6,16 +6,14 @@ let isRecording = false;
 let currentMeetingName = null;
 let currentUserEmail = null;
 let uploadInterval = null;
-let chunkCounter = 0;
 let segmentCounter = 0;
 let isUploading = false;
 
+// 🔹 store chunks for current segment
+let segmentChunks = [];
+
 export function isRecordingActive() {
   return isRecording && mediaRecorder && mediaRecorder.state === 'recording';
-}
-
-export function getCurrentMeetingName() {
-  return currentMeetingName;
 }
 
 export async function startRecording(meetingName, userEmail = null) {
@@ -25,7 +23,7 @@ export async function startRecording(meetingName, userEmail = null) {
   }
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ 
+    const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
       audio: true,
     });
@@ -34,36 +32,13 @@ export async function startRecording(meetingName, userEmail = null) {
     currentMeetingName = meetingName;
     currentUserEmail = userEmail;
     isRecording = true;
-    chunkCounter = 0;
     segmentCounter = 0;
 
-    mediaRecorder = new MediaRecorder(stream, {
-      mimeType: "video/webm;codecs=vp9,opus",
-    });
+    startNewSegment();
 
-    mediaRecorder.ondataavailable = async (e) => {
-      if (e.data.size > 0) {
-        chunkCounter++;
-        console.log(`Chunk ${chunkCounter} (segment ${segmentCounter}), size: ${e.data.size} bytes`);
-        await appendBlob({
-          userEmail: userEmail, 
-          meetingId: meetingName,
-          blob: e.data, 
-          chunkIndex: chunkCounter,
-          segmentIndex: segmentCounter
-        });
-      }
-    };
+    // 🔹 start interval to rotate segments
+    startUploadInterval();
 
-    mediaRecorder.onerror = (event) => {
-      console.error("MediaRecorder error:", event.error);
-    };
-
-    mediaRecorder.start(2000); // Collect data every 2s
-    
-    // Start upload interval
-    startUploadInterval(meetingName, userEmail);
-    
     console.log("Recording started.");
   } catch (err) {
     console.error("Error accessing camera/mic:", err);
@@ -71,138 +46,123 @@ export async function startRecording(meetingName, userEmail = null) {
   }
 }
 
-function startUploadInterval(meetingName, userEmail) {
+// 🔥 Start a fresh MediaRecorder (new segment)
+function startNewSegment() {
+  segmentChunks = [];
+
+  mediaRecorder = new MediaRecorder(currentStream, {
+    mimeType: "video/webm;codecs=vp9,opus",
+  });
+
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) {
+      segmentChunks.push(e.data);
+    }
+  };
+
+  mediaRecorder.onerror = (event) => {
+    console.error("MediaRecorder error:", event.error);
+  };
+
+  mediaRecorder.onstop = async () => {
+    console.log(`🧩 Finalizing segment ${segmentCounter}`);
+
+    if (segmentChunks.length === 0) return;
+
+    const finalBlob = new Blob(segmentChunks, { type: "video/webm" });
+
+    console.log(`📦 Segment ${segmentCounter} size: ${finalBlob.size}`);
+
+    // store in IndexedDB
+    await appendBlob({
+      userEmail: currentUserEmail,
+      meetingId: currentMeetingName,
+      blob: finalBlob,
+      chunkIndex: segmentCounter,
+      segmentIndex: segmentCounter,
+    });
+
+    // upload in background
+    if (!isUploading) {
+      uploadOldestSegment(currentMeetingName, currentUserEmail);
+    }
+  };
+
+  mediaRecorder.start(); // 🔥 IMPORTANT: no 2s slicing
+}
+
+// 🔁 Rotate segments every 60s
+function startUploadInterval() {
   uploadInterval = setInterval(async () => {
-    console.log("⏰ 60 seconds elapsed - finalizing segment and starting new one...");
-    
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      // Request final data to ensure we get the last chunk
-      mediaRecorder.requestData();
-      
-      // Stop to finalize the segment (adds proper end markers)
-      mediaRecorder.stop();
-      
-      // Wait for ondataavailable to process the final chunk
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Move to next segment
+    console.log("⏰ 60s reached → rotating segment");
+
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+      mediaRecorder.stop(); // 🔥 finalize segment
+
+      // wait for onstop to finish
+      await new Promise((r) => setTimeout(r, 1000));
+
       segmentCounter++;
-      chunkCounter = 0;
-      
-      // Upload oldest segment in background
-      if (!isUploading) {
-        uploadOldestSegment(meetingName, userEmail);
-      }
-      
-      // Restart MediaRecorder for new segment (gets new headers)
+
       if (currentStream && isRecording) {
-        mediaRecorder = new MediaRecorder(currentStream, {
-          mimeType: "video/webm;codecs=vp9,opus",
-        });
-
-        mediaRecorder.ondataavailable = async (e) => {
-          if (e.data.size > 0) {
-            chunkCounter++;
-            console.log(`Chunk ${chunkCounter} (segment ${segmentCounter}), size: ${e.data.size} bytes`);
-            await appendBlob({
-              userEmail: userEmail, 
-              meetingId: meetingName,
-              blob: e.data, 
-              chunkIndex: chunkCounter,
-              segmentIndex: segmentCounter
-            });
-          }
-        };
-
-        mediaRecorder.onerror = (event) => {
-          console.error("MediaRecorder error:", event.error);
-        };
-
-        mediaRecorder.start(2000);
-        console.log(`✅ Started recording segment ${segmentCounter}`);
+        startNewSegment(); // 🔥 start fresh recorder
       }
     }
   }, 60000);
 }
 
+// 📤 Upload oldest segment from IndexedDB
 async function uploadOldestSegment(meetingId, userEmail) {
-  if (isUploading) {
-    console.log("⚠️ Upload already in progress, skipping...");
-    return;
-  }
-  
-  if (!navigator.onLine) {
-    console.log("❌ No internet connection");
-    return;
-  }
-  
+  if (isUploading) return;
+  if (!navigator.onLine) return;
+
   isUploading = true;
-  
+
   try {
     const { db } = await import('../db/db.js');
-    
-    // Get all chunks
-    const allChunks = await db.chunks
+
+    const allSegments = await db.chunks
       .where('meetingId')
       .equals(meetingId)
       .toArray();
-    
-    if (allChunks.length === 0) {
-      console.log("✅ No chunks to upload");
+
+    if (allSegments.length === 0) {
+      console.log("✅ No segments to upload");
       return;
     }
-    
-    // Find oldest segment
-    const oldestSegmentIndex = Math.min(...allChunks.map(c => c.segmentIndex));
-    
-    // Get chunks for oldest segment, sorted by chunkIndex
-    const chunks = allChunks
-      .filter(c => c.segmentIndex === oldestSegmentIndex)
-      .sort((a, b) => a.chunkIndex - b.chunkIndex);
-    
-    console.log(`📦 Uploading segment ${oldestSegmentIndex} with ${chunks.length} chunks`);
-    
-    // Merge blobs
-    const blobs = chunks.map(c => c.blob);
-    const mergedBlob = new Blob(blobs, { type: 'video/webm' });
-    
-    console.log(`📤 Uploading ${mergedBlob.size} bytes...`);
-    
-    // Upload
+
+    const oldestSegment = allSegments[0];
+
+    console.log(`📤 Uploading segment ${oldestSegment.segmentIndex}`);
+
     const formData = new FormData();
-    formData.append("file", mergedBlob, `segment-${oldestSegmentIndex}.webm`);
+    formData.append(
+      "file",
+      oldestSegment.blob,
+      `segment-${oldestSegment.segmentIndex}.webm`
+    );
     formData.append("userId", userEmail);
-    formData.append("chunkIndex", oldestSegmentIndex);
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
-    
+    formData.append("chunkIndex", oldestSegment.segmentIndex);
+
     const response = await fetch(
       `${import.meta.env.VITE_BACKEND_URL}/uploadSegment/${meetingId}`,
       {
-        method: 'POST',
+        method: "POST",
         body: formData,
-        signal: controller.signal
       }
     );
-    
-    clearTimeout(timeoutId);
-    
+
     if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
+      throw new Error(await response.text());
     }
-    
-    console.log(`✅ Segment ${oldestSegmentIndex} uploaded successfully`);
-    
-    // Delete chunks only after successful upload
-    for (const chunk of chunks) {
-      await db.chunks.delete(chunk.id);
-    }
-    
-    console.log(`🗑️ Deleted ${chunks.length} chunks from IndexedDB`);
-    
-  } catch (error) {
-    console.error(`❌ Upload error:`, error);
+
+    console.log(`✅ Segment ${oldestSegment.segmentIndex} uploaded`);
+
+    // delete after upload
+    await db.chunks.delete(oldestSegment.id);
+
+  } catch (err) {
+    console.error("❌ Upload error:", err);
   } finally {
     isUploading = false;
   }
@@ -213,20 +173,19 @@ export function stopRecording() {
     clearInterval(uploadInterval);
     uploadInterval = null;
   }
-  
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
     mediaRecorder.stop();
-    console.log("Recording stopped.");
   }
-  
+
   isRecording = false;
 }
 
 export function cleanupRecording() {
   stopRecording();
-  
+
   if (currentStream) {
-    currentStream.getTracks().forEach(track => track.stop());
+    currentStream.getTracks().forEach((track) => track.stop());
     currentStream = null;
   }
 }
