@@ -17,10 +17,7 @@ export function getMeetingName() {
   return currentMeetingName;
 }
 
-axios.post('/getMeetingId', {meetingName: currentMeetingName});
-
-
 // Store for meeting chunks
 db.version(5).stores({
-  meetingName: "++id, userId, meetingId, segmentIndex, timestamp, retries, uploaded" // segmentIndex groups chunks into 60s segments
+  chunks: "++id, userId, meetingId, segmentIndex, timestamp, retries, uploaded" // segmentIndex groups chunks into 60s segments
 });
