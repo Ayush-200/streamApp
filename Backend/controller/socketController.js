@@ -26,15 +26,17 @@ export function socketHandler(io) {
                     });
                 } else {
                     const exists = meetingDoc.participants.some(p => p.userId === userId);
-                    // if (!exists) {
+                    if (!exists) {
                         meetingDoc.participants.push({ userId, joinTime: new Date() });
                         meetingDoc.participantCount = meetingDoc.participants.length;
                         await meetingDoc.save();
-                    // }
+                    } else {
+                        console.log(`Participant ${userId} already exists in meeting ${meetingId}`);
+                    }
                 }
 
                 // Update everyone in meeting (emit current socket room size)
-                await updateParticipantCount(meetingId, io);
+                // await updateParticipantCount(meetingId, io);
 
                 // Acknowledge join
                 socket.emit("joined_meeting", meetingId);
@@ -76,7 +78,7 @@ export function socketHandler(io) {
         socket.on("disconnect", () => {
             console.log("socket disconnected:", socket.id);
             if (current_meeting_id) {
-                updateParticipantCount(current_meeting_id, io);
+                // updateParticipantCount(current_meeting_id, io);
             }
         });
     });

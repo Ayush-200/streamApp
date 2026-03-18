@@ -16,6 +16,7 @@
   import  socket  from './utils/socket.js';
   import { useAuth0 } from "@auth0/auth0-react";
   import {startRecording, stopRecording, cleanupRecording, isRecordingActive } from './utils/recording.js';
+  import { setMeetingName } from './db/db.js';
   const apiKey = "55gcbd3wd3nk";
 
   const MeetingUI = ({ showParticipantList, setShowParticipantList, join, setJoin }) => {
@@ -106,6 +107,8 @@
       console.log("meeting name", meetingName)
       console.log(recording);
       
+      // Set meeting name in db.js for global access
+      setMeetingName(meetingName);
 
       socket.emit("join_meeting", {meetingId: meetingName, userId: user.email});
 
