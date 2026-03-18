@@ -24,33 +24,25 @@ export const uploadBlob = async (req, res) => {
     console.log(`File received - Size: ${blob.size} bytes, Type: ${blob.mimetype}`);
 
     try {
-        // cloudinary.uploader.upload expects a file path or base64 string, not buffer
-        // For buffer, we need to use upload_stream
-        const result = await new Promise((resolve, reject) => {
-            const uploadStream = cloudinary.uploader.upload_stream(
-                {
-                    resource_type: "video",
-                    format: "webm",
-                    upload_preset: "THIS_IS_MY_PRESET",
-                    public_id: `recordings/${meetingId}/${userId}/segment_${chunkIndex}`,
-                    tags: [meetingId, userId],
-                    folder: `meeting_recordings/${meetingId}`, // Use meetingId as folder
-                    chunk_size: 6000000
-                },
-                (error, result) => {
-                    if (error) {
-                        console.error("❌ Cloudinary upload error:", error);
-                        reject(error);
-                    } else {
-                        console.log(`✅ Chunk ${chunkIndex} uploaded to Cloudinary`);
-                        resolve(result);
-                    }
-                }
-            );
-            
-            // Write the buffer to the stream
-            uploadStream.end(blob.buffer);
-        });
+        // Convert buffer to base64 for upload_large
+        const base64Data = `data:${blob.mimetype};base64,${blob.buffer.toString('base64')}`;
+        
+        console.log(`📤 Using upload_large for better handling of video segments`);
+        
+        // Use upload_large which is optimized for large files and supports parallel chunk processing
+        const result = await cloudinary.uploader.upload_large(
+            base64Data,
+            {
+                resource_type: "video",
+                format: "webm",
+                upload_preset: "THIS_IS_MY_PRESET",
+                public_id: `recordings/${meetingId}/${userId}/segment_${chunkIndex}`,
+                tags: [meetingId, userId],
+                folder: `meeting_recordings/${meetingId}`,
+                chunk_size: 6000000, // 6MB chunks for parallel upload
+                timeout: 600000 // 10 minutes timeout
+            }
+        );
 
         console.log(`✅ Upload successful - URL: ${result.secure_url}`);
         res.json({ success: true, url: result.secure_url, chunkIndex });
