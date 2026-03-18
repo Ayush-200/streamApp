@@ -1,6 +1,6 @@
 // db.js
 import { Dexie } from "dexie";
-import axios from "axios";
+
 export const db = new Dexie("myDatabase");
 
 // Global variable to store current meeting name
@@ -20,4 +20,9 @@ export function getMeetingName() {
 // Store for meeting chunks
 db.version(5).stores({
   chunks: "++id, userId, meetingId, segmentIndex, timestamp, retries, uploaded" // segmentIndex groups chunks into 60s segments
+});
+
+// Ensure database is opened
+db.open().catch((err) => {
+  console.error("Failed to open database:", err);
 });
