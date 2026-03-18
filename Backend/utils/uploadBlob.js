@@ -21,7 +21,8 @@ export const uploadBlob = async (req, res) => {
             const uploadStream = cloudinary.uploader.upload_stream(
                 {
                     resource_type: "video",
-                    format: "webm", // Explicitly specify format
+                    format: "webm",
+                    upload_preset: "THIS_IS_MY_PRESET",
                     public_id: `recordings/${meetingId}/${userId}/chunk_${chunkIndex}`,
                     tags: [meetingId, userId],
                     folder: `meeting_recordings/${meetingId}`,
