@@ -1,8 +1,10 @@
 import { MeetingDB } from "../models/model";
-export const getMeetingId = (meetingName) => {
+export const getMeetingId = async (meetingName) => {
+
+    let meeting;
     
     try{
-        const meeting = MeetingDB.findOne({
+        meeting = await MeetingDB.findOne({
             meetingName: meetingName
         })
     }catch(err){
