@@ -10,7 +10,9 @@ const userSchema = new mongoose.Schema({
 
 
 const meetingSchema = new mongoose.Schema({
-    meetingName: {type: String}
+    meetingName: {type: String, required: true},
+    meetingId: {type: String, required: true, unique: true}, // Unique ID for Cloudinary
+    createdAt: {type: Date, default: Date.now}
 })
 
 

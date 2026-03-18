@@ -12,6 +12,15 @@ export const uploadBlob = async (req, res) => {
         return res.status(400).json({ error: "No file uploaded" });
     }
 
+    // Verify what multer received
+    console.log("=== MULTER FILE INFO ===");
+    console.log("originalname:", blob.originalname);
+    console.log("mimetype:", blob.mimetype);
+    console.log("size:", blob.size);
+    console.log("buffer length:", blob.buffer.length);
+    console.log("First 20 bytes:", blob.buffer.slice(0, 20));
+    console.log("========================");
+
     console.log(`File received - Size: ${blob.size} bytes, Type: ${blob.mimetype}`);
 
     try {
@@ -23,10 +32,10 @@ export const uploadBlob = async (req, res) => {
                     resource_type: "video",
                     format: "webm",
                     upload_preset: "THIS_IS_MY_PRESET",
-                    public_id: `recordings/${meetingId}/${userId}/chunk_${chunkIndex}`,
+                    public_id: `recordings/${meetingId}/${userId}/segment_${chunkIndex}`,
                     tags: [meetingId, userId],
-                    folder: `meeting_recordings/${meetingId}`,
-                    chunk_size: 6000000 // 6MB chunks for large files
+                    folder: `meeting_recordings/${meetingId}`, // Use meetingId as folder
+                    chunk_size: 6000000
                 },
                 (error, result) => {
                     if (error) {

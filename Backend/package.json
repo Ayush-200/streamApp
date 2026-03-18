@@ -11,6 +11,7 @@
     "ffmpeg-static": "^5.2.0",
     "mongoose": "^8.18.0",
     "multer": "^2.0.2",
+    "nanoid": "^5.1.7",
     "socket.io": "^4.8.1"
   }
 }
