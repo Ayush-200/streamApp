@@ -1,4 +1,4 @@
-import { MeetingDB } from "../models/model";
+import { MeetingDB } from "../models/model.js";
 export const getMeetingId = async (meetingName) => {
 
     let meeting;
