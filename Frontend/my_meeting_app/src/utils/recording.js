@@ -87,6 +87,12 @@ function startSegmentRecording(stream, meetingName, userEmail, segmentIndex) {
       console.log(`   - Type: ${segmentBlob.type}`);
       console.log(`   - First 20 bytes:`, await segmentBlob.slice(0, 20).arrayBuffer());
 
+      // Ensure database is ready
+      if (!db.isOpen()) {
+        console.log("⚠️ Database not open, opening now...");
+        await db.open();
+      }
+
       // Save to IndexedDB
       await db.chunks.add({
         userId: userEmail,
