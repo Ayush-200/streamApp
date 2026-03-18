@@ -91,7 +91,7 @@ function startSegmentRecording(stream, meetingName, userEmail, segmentIndex) {
       if (!db.isOpen()) {
         console.log("⚠️ Database not open, opening now...");
         await db.open();
-      }
+      } 
 
       // Save to IndexedDB
       await db.chunks.add({
