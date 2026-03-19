@@ -1,10 +1,11 @@
 import {React, useState} from 'react'
 import { useNavigate } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
-import { FaPlus, FaPhone, FaCalendarAlt, FaClock } from 'react-icons/fa';
+import { FaPlus, FaPhone, FaCalendarAlt, FaClock, FaPlay, FaPause } from 'react-icons/fa';
 import { MdFiberManualRecord } from 'react-icons/md';
 import { useEffect } from 'react';
 import fetchMeetings from './utils/fetchMeeting.js';
+import { uploadOldestSegment, isUploadInProgress } from './utils/uploadSegment.js';
 
 const Home = ({ setJoin }) => {
 
@@ -17,6 +18,7 @@ const Home = ({ setJoin }) => {
   console.log("user in home.jsx", user);
 
   const [meetings, setMeeting] = useState([]);
+  const [uploadingMeetings, setUploadingMeetings] = useState({}); // Track upload state per meeting
 
    useEffect(() => {
      
@@ -24,10 +26,62 @@ const Home = ({ setJoin }) => {
      const emailId = user.email;
      
      console.log(user.email);
-     const topFour = fetchMeetings();
-     setMeeting(topFour);
+     
+     const loadMeetings = async () => {
+       try {
+         const topFour = await fetchMeetings(emailId);
+         setMeeting(topFour);
+       } catch (error) {
+         console.error("Error fetching meetings:", error);
+       }
+     };
+     
+     loadMeetings();
    }, [user, isAuthenticated, isLoading])
   
+  // Handle upload toggle for a specific meeting
+  const handleUploadToggle = async (meetingName, e) => {
+    e.stopPropagation(); // Prevent navigation when clicking the button
+    
+    const isCurrentlyUploading = uploadingMeetings[meetingName];
+    
+    if (isCurrentlyUploading) {
+      // Pause upload
+      setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
+      console.log(`⏸️ Paused upload for meeting: ${meetingName}`);
+    } else {
+      // Start/Resume upload
+      setUploadingMeetings(prev => ({ ...prev, [meetingName]: true }));
+      console.log(`▶️ Starting upload for meeting: ${meetingName}`);
+      
+      // Start continuous upload loop
+      startUploadLoop(meetingName);
+    }
+  };
+  
+  // Continuous upload loop for a meeting
+  const startUploadLoop = async (meetingName) => {
+    while (uploadingMeetings[meetingName]) {
+      try {
+        await uploadOldestSegment(meetingName, emailId);
+        
+        // Check if there are more segments to upload
+        if (!isUploadInProgress()) {
+          // No more segments, stop uploading
+          setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
+          console.log(`✅ All segments uploaded for meeting: ${meetingName}`);
+          break;
+        }
+        
+        // Wait a bit before next upload
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error(`Error uploading segment for ${meetingName}:`, error);
+        setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
+        break;
+      }
+    }
+  };
 
 
   // Sample upcoming meetings data
@@ -113,28 +167,67 @@ const Home = ({ setJoin }) => {
         </div>
 
         {/* Upcoming Meetings Section */}
-       <div className="flex gap-4 overflow-x-auto h-[90px]">
-  {meetings.length > 0 ? (
-    meetings.map((m, i) => (
-      <div onClick={() =>window.location.href=`${import.meta.env.VITE_BACKEND_URL}/meeting/${m.meeting}`}
-        key={i}
-        className="flex flex-col justify-center min-w-[200px] p-4 bg-slate-700 rounded-lg text-white shadow-md hover:bg-[#EA2264]"
-      >
-        <p className="font-semibold">{m.meeting}</p>
-        <p className="text-sm text-gray-300">
-          {new Date(m.date).toLocaleDateString("en-US", {
-            weekday: "short", // e.g., Thu
-            year: "numeric",  // 2025
-            month: "short",   // Sep
-            day: "numeric",   // 25
-          })}
-        </p>
-      </div>
-    ))
-  ) : (
-    <p className="text-gray-400">No upcoming meetings</p>
-  )}
-</div>
+        <div className='bg-slate-800 rounded-xl p-6 shadow-lg'>
+          <h3 className='text-2xl font-bold text-white mb-4 flex items-center'>
+            <FaCalendarAlt className='mr-3 text-[#FFBA08]' />
+            Your Meetings
+          </h3>
+          
+          {meetings.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {meetings.map((m, i) => (
+                <div
+                  key={i}
+                  onClick={() => navigate(`/meeting/${m.meeting}`)}
+                  className="cursor-pointer p-4 bg-slate-700 rounded-lg border border-slate-600 hover:border-[#FFBA08] hover:bg-slate-600 transition-all duration-300 group relative"
+                >
+                  <div className='flex items-start justify-between mb-2'>
+                    <MdFiberManualRecord className='text-[#3F88C5] group-hover:text-[#FFBA08] mt-1' />
+                    <span className='text-xs text-gray-400'>
+                      {new Date(m.date).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  <p className="font-semibold text-white group-hover:text-[#FFBA08] mb-1">
+                    {m.meeting}
+                  </p>
+                  <p className="text-sm text-gray-400 mb-3">
+                    {new Date(m.date).toLocaleDateString("en-US", {
+                      weekday: "short",
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </p>
+                  
+                  {/* Upload Segment Button */}
+                  <button
+                    onClick={(e) => handleUploadToggle(m.meeting, e)}
+                    className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-300 ${
+                      uploadingMeetings[m.meeting]
+                        ? 'bg-[#D00000] hover:bg-red-700'
+                        : 'bg-[#FFBA08] hover:bg-[#FF7A30]'
+                    }`}
+                    title={uploadingMeetings[m.meeting] ? 'Pause Upload' : 'Upload Segments'}
+                  >
+                    {uploadingMeetings[m.meeting] ? (
+                      <FaPause className='text-white text-sm' />
+                    ) : (
+                      <FaPlay className='text-[#032B43] text-sm' />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className='text-center py-8'>
+              <p className="text-gray-400 text-lg">No upcoming meetings</p>
+              <p className="text-gray-500 text-sm mt-2">Create or schedule a meeting to get started</p>
+            </div>
+          )}
+        </div>
 
       </div>
 

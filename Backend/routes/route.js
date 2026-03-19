@@ -50,7 +50,7 @@ router.post('/removeMeetingFromSchedule/:emailId', removeMeetingFromSchedule);
 
 router.post('/uploadChunk/:meetingId', upload.single('file'), uploadBlob);
 
-router.get('/getMeetingId', getMeetingId);
+router.get('/getMeetingId/:meetingName', getMeetingId);
 
 router.post('/uploadSegment/:meetingId', upload.single('file'), uploadBlob); // Reuse uploadBlob handler
 
