@@ -7,4 +7,9 @@ const socket = io(import.meta.env.VITE_BACKEND_URL, {
   reconnectionDelay: 2000,
 });
 
+socket.onclose = () => {
+  console.log("Socket closed. Reconnecting...");
+  setTimeout(connectWebSocket, 2000);
+};
+
 export default socket;
