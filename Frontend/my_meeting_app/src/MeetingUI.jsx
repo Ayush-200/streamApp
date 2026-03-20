@@ -103,44 +103,57 @@
     
     useEffect(() => {
       if (!call || !user) return;
-      console.log("under useEffect ");
-      console.log("meeting name", meetingName)
-      console.log(recording);
+      console.log("🎬 [MEETING_UI] ========== SETTING UP MEETING ==========");
+      console.log("👤 [MEETING_UI] User:", user.email);
+      console.log("📍 [MEETING_UI] Meeting:", meetingName);
+      console.log("🎙️ [MEETING_UI] Recording:", recording);
       
       // Set meeting name in db.js for global access
       setMeetingName(meetingName);
 
+      console.log("📡 [MEETING_UI] Emitting join_meeting event...");
       socket.emit("join_meeting", {meetingId: meetingName, userId: user.email});
 
     
 
       socket.on("start_recording", () =>{
-        console.log("start_recording socket endpoint hitted");
+        console.log("🔴 [MEETING_UI] start_recording event received");
         setRecording(true);
         startRecording(meetingName, user?.email);
       });
 
       socket.on("stop_recording", () =>{
-        console.log("recoding stopped endpoint hitted");
+        console.log("⏹️ [MEETING_UI] stop_recording event received");
         stopRecording(meetingName);
         
       })
 
       socket.on("download_ready", ({url}) =>{
-      console.log("download ready at: ", url);
+      console.log("📥 [MEETING_UI] download_ready at:", url);
       window.location.href = `${import.meta.env.VITE_BACKEND_URL}${url}`;
       })
       
       socket.on("joined_meeting", (meetingId) => {
-    
-        console.log("Joined room:", meetingId);
+        console.log("✅ [MEETING_UI] joined_meeting confirmation for:", meetingId);
       });
 
+      // Cleanup function when user leaves
       return () => {
+        console.log("🚪 [MEETING_UI] ========== CLEANUP: USER LEAVING ==========");
+        console.log("👤 [MEETING_UI] User leaving:", user.email);
+        console.log("📍 [MEETING_UI] From meeting:", meetingName);
+        console.log("📡 [MEETING_UI] Emitting leave_meeting event...");
+        
+        socket.emit("leave_meeting", { meetingId: meetingName, userId: user.email });
+        
+        console.log("🧹 [MEETING_UI] Removing socket listeners...");
         socket.off("start_recording");
         socket.off("stop_recording");
         socket.off("join_meeting");
         socket.off("ready_to_download");
+        
+        console.log("✅ [MEETING_UI] Cleanup complete");
+        console.log("🚪 [MEETING_UI] ========== LEAVE COMPLETE ==========\n");
       };
     }, [call, meetingName, user]);
 
@@ -158,48 +171,61 @@
     // Warn user before leaving/closing tab if recording is active
     useEffect(() => {
       const handleBeforeUnload = (e) => {
+        console.log("🌐 [BROWSER] beforeunload event triggered");
+        
+        // Emit leave_meeting before page unload
+        if (user?.email && meetingName) {
+          console.log("📡 [BROWSER] Emitting leave_meeting before unload");
+          console.log("👤 [BROWSER] User:", user.email);
+          console.log("📍 [BROWSER] Meeting:", meetingName);
+          socket.emit("leave_meeting", { meetingId: meetingName, userId: user.email });
+        }
+        
         if (isRecordingActive()) {
-          // Standard way to show browser warning
+          console.warn("⚠️ [BROWSER] Recording is active, showing warning");
           e.preventDefault();
-          e.returnValue = ''; // Chrome requires returnValue to be set
-          
-          // Custom message (note: most modern browsers ignore custom messages and show their own)
+          e.returnValue = '';
           const message = 'Recording is in progress. If you leave now, your recording may be lost. Are you sure you want to leave?';
           e.returnValue = message;
           return message;
         }
       };
 
-      // Add event listener
       window.addEventListener('beforeunload', handleBeforeUnload);
 
-      // Cleanup
       return () => {
         window.removeEventListener('beforeunload', handleBeforeUnload);
       };
-    }, [recording]); // Re-run when recording state changes
+    }, [recording, user, meetingName]);
 
     // Handle cleanup when call ends or user navigates away
     useEffect(() => {
       if (!call) return;
 
-      // Cleanup function
       const handleCleanup = () => {
+        console.log("🔙 [NAVIGATION] popstate/navigation event triggered");
+        
+        // Emit leave_meeting on navigation
+        if (user?.email && meetingName) {
+          console.log("📡 [NAVIGATION] Emitting leave_meeting");
+          console.log("👤 [NAVIGATION] User:", user.email);
+          console.log("📍 [NAVIGATION] Meeting:", meetingName);
+          socket.emit("leave_meeting", { meetingId: meetingName, userId: user.email });
+        }
+        
         if (isRecordingActive()) {
-          console.log("Cleaning up recording before leaving");
+          console.log("🧹 [NAVIGATION] Cleaning up recording");
           cleanupRecording();
         }
       };
 
-      // Listen for browser navigation (back/forward)
       window.addEventListener('popstate', handleCleanup);
 
-      // Cleanup on component unmount (covers React Router navigation)
       return () => {
         handleCleanup();
         window.removeEventListener('popstate', handleCleanup);
       };
-    }, [call]);
+    }, [call, user, meetingName]);
 
     
 
