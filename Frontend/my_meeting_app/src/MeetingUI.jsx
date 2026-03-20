@@ -23,6 +23,8 @@
     const [client, setClient] = useState(null);
     const [recording, setRecording] = useState(false);
     const [call, setCall] = useState(null);
+    const [sessionId, setSessionId] = useState(null);
+    const [sessionCounter, setSessionCounter] = useState(0);
     const { meetingName } = useParams();
     const { user, isLoading, isAuthenticated } = useAuth0();
 
@@ -110,9 +112,34 @@
       // Set meeting name in db.js for global access
       setMeetingName(meetingName);
 
-      socket.emit("join_meeting", {meetingId: meetingName, userId: user.email});
+      // Generate initial sessionId
+      const initialSessionId = `${user.email}_0`;
+      setSessionId(initialSessionId);
 
-    
+      // Emit join_meeting with sessionId
+      socket.emit("join_meeting", {
+        meetingId: meetingName, 
+        userId: user.email,
+        sessionId: initialSessionId
+      });
+
+      // Listen for session counter updates from server
+      socket.on("session_counter_updated", ({ meetingId, counter }) => {
+        console.log(`Session counter updated for ${meetingId}: ${counter}`);
+        setSessionCounter(counter);
+        
+        // Update sessionId with new counter
+        const newSessionId = `${user.email}_${counter}`;
+        setSessionId(newSessionId);
+        console.log(`Updated sessionId to: ${newSessionId}`);
+      });
+
+      // Listen for session rejoin (when user leaves and new session is created)
+      socket.on("session_rejoined", ({ newSessionId, counter }) => {
+        console.log(`Session rejoined with new sessionId: ${newSessionId}`);
+        setSessionId(newSessionId);
+        setSessionCounter(counter);
+      });
 
       socket.on("start_recording", () =>{
         console.log("start_recording socket endpoint hitted");
@@ -137,10 +164,21 @@
       });
 
       return () => {
+        // Emit leave_meeting when component unmounts
+        if (sessionId) {
+          socket.emit("leave_meeting", { 
+            sessionId,
+            meetingId: meetingName,
+            userId: user.email
+          });
+        }
+        
         socket.off("start_recording");
         socket.off("stop_recording");
         socket.off("join_meeting");
         socket.off("ready_to_download");
+        socket.off("session_counter_updated");
+        socket.off("session_rejoined");
       };
     }, [call, meetingName, user]);
 
