@@ -24,8 +24,19 @@ cloudinary.config({
 });
 
 
-// app.options("*", cors());
-app.use(cors());
+// CORS configuration
+const corsOptions = {
+  origin: [
+    "https://streamapp-webapp.onrender.com",
+    "http://localhost:5173", // Vite default port
+    "http://localhost:3000"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
