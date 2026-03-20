@@ -1,23 +1,18 @@
 import { db } from "../db/db.js";
 
-let isUploading = false;
+let activeUploads = new Set(); // Track active upload segment indices
+const MAX_CONCURRENT_UPLOADS = 3; // Upload up to 3 segments in parallel
 
 export async function uploadOldestSegment(meetingId, userEmail) {
-  if (isUploading) {
-    console.log("⚠️ [UPLOAD] Already in progress, skipping...");
-    return;
-  }
-  
   if (!navigator.onLine) {
     console.log("❌ [UPLOAD] No internet connection");
     return;
   }
   
-  isUploading = true;
   console.log("🚀 [STEP 6] Starting upload process...");
   
   try {
-    // Get all segments
+    // Get all segments that haven't been uploaded yet
     const allSegments = await db.chunks
       .where('meetingId')
       .equals(meetingId)
@@ -28,35 +23,61 @@ export async function uploadOldestSegment(meetingId, userEmail) {
       return;
     }
     
-    // Find oldest segment
-    const oldestSegmentIndex = Math.min(...allSegments.map(c => c.segmentIndex));
-    const segment = allSegments.find(c => c.segmentIndex === oldestSegmentIndex);
+    // Filter out segments that are currently being uploaded
+    const availableSegments = allSegments.filter(s => !activeUploads.has(s.segmentIndex));
     
-    console.log(`📤 [STEP 7] Preparing to upload segment ${oldestSegmentIndex}`);
+    if (availableSegments.length === 0) {
+      console.log("⚠️ [UPLOAD] All segments are currently being uploaded");
+      return;
+    }
+    
+    // Sort by segment index and take up to MAX_CONCURRENT_UPLOADS
+    const segmentsToUpload = availableSegments
+      .sort((a, b) => a.segmentIndex - b.segmentIndex)
+      .slice(0, MAX_CONCURRENT_UPLOADS);
+    
+    console.log(`📤 [UPLOAD] Uploading ${segmentsToUpload.length} segments in parallel`);
+    
+    // Upload segments in parallel
+    const uploadPromises = segmentsToUpload.map(segment => 
+      uploadSingleSegment(segment, meetingId, userEmail)
+    );
+    
+    await Promise.allSettled(uploadPromises);
+    
+  } catch (error) {
+    console.error(`❌ [UPLOAD ERROR]:`, error);
+  }
+}
+
+async function uploadSingleSegment(segment, meetingId, userEmail) {
+  const segmentIndex = segment.segmentIndex;
+  
+  // Mark as being uploaded
+  activeUploads.add(segmentIndex);
+  
+  try {
+    console.log(`📤 [STEP 7] Preparing to upload segment ${segmentIndex}`);
     console.log(`   - Blob size: ${segment.blob.size} bytes`);
     console.log(`   - Blob type: ${segment.blob.type}`);
     
-    // Read first 20 bytes to verify it's video data
-    const firstBytes = await segment.blob.slice(0, 20).arrayBuffer();
-    console.log(`   - First 20 bytes:`, new Uint8Array(firstBytes));
-    
     // Create FormData with proper File object
-    const file = new File([segment.blob], `segment-${oldestSegmentIndex}.webm`, {
+    const file = new File([segment.blob], `segment-${segmentIndex}.webm`, {
       type: 'video/webm'
     });
     
     const formData = new FormData();
     formData.append("file", file);
     formData.append("userId", userEmail);
-    formData.append("chunkIndex", oldestSegmentIndex);
+    formData.append("chunkIndex", segmentIndex);
     
-    console.log(`📨 [STEP 8] FormData created with File object`);
+    console.log(`📨 [STEP 8] FormData created for segment ${segmentIndex}`);
     console.log(`   - File name: ${file.name}`);
     console.log(`   - File type: ${file.type}`);
     console.log(`   - File size: ${file.size}`);
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes to match backend
     
     const response = await fetch(
       `${import.meta.env.VITE_BACKEND_URL}/uploadSegment/${meetingId}`,
@@ -75,20 +96,22 @@ export async function uploadOldestSegment(meetingId, userEmail) {
     }
     
     const result = await response.json();
-    console.log(`✅ [STEP 9] Segment ${oldestSegmentIndex} uploaded successfully:`, result);
+    console.log(`✅ [STEP 9] Segment ${segmentIndex} uploaded successfully:`, result);
     
     // Delete segment only after successful upload
     await db.chunks.delete(segment.id);
     
-    console.log(`🗑️ [STEP 10] Deleted segment ${oldestSegmentIndex} from IndexedDB`);
+    console.log(`🗑️ [STEP 10] Deleted segment ${segmentIndex} from IndexedDB`);
     
   } catch (error) {
-    console.error(`❌ [UPLOAD ERROR]:`, error);
+    console.error(`❌ [UPLOAD ERROR] Segment ${segmentIndex}:`, error);
+    throw error; // Re-throw to be caught by Promise.allSettled
   } finally {
-    isUploading = false;
+    // Remove from active uploads
+    activeUploads.delete(segmentIndex);
   }
 }
 
 export function isUploadInProgress() {
-  return isUploading;
+  return activeUploads.size > 0;
 }

@@ -155,6 +155,30 @@
       };
     }, []);
 
+    // Warn user before leaving/closing tab if recording is active
+    useEffect(() => {
+      const handleBeforeUnload = (e) => {
+        if (isRecordingActive()) {
+          // Standard way to show browser warning
+          e.preventDefault();
+          e.returnValue = ''; // Chrome requires returnValue to be set
+          
+          // Custom message (note: most modern browsers ignore custom messages and show their own)
+          const message = 'Recording is in progress. If you leave now, your recording may be lost. Are you sure you want to leave?';
+          e.returnValue = message;
+          return message;
+        }
+      };
+
+      // Add event listener
+      window.addEventListener('beforeunload', handleBeforeUnload);
+
+      // Cleanup
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      };
+    }, [recording]); // Re-run when recording state changes
+
     // Handle cleanup when call ends or user navigates away
     useEffect(() => {
       if (!call) return;

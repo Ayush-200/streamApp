@@ -13,7 +13,8 @@ import { addUserMeeting } from '../utils/addUserMeeting.js';
 import { addMeetingName } from '../utils/addMeetingName.js';
 import { uploadBlob } from '../utils/uploadBlob.js';
 import multer from 'multer';
-import {getMeetingId} from '../utils/getMeetingId.js'
+import {getMeetingId} from '../utils/getMeetingId.js';
+import { MeetingParticipantDB } from '../models/model.js';
 
 // Setup multer for memory storage
 const upload = multer({ storage: multer.memoryStorage() });
@@ -50,8 +51,36 @@ router.post('/removeMeetingFromSchedule/:emailId', removeMeetingFromSchedule);
 
 router.post('/uploadChunk/:meetingId', upload.single('file'), uploadBlob);
 
-router.get('/getMeetingId', getMeetingId);
+router.get('/getMeetingId/:meetingName', getMeetingId);
 
 router.post('/uploadSegment/:meetingId', upload.single('file'), uploadBlob); // Reuse uploadBlob handler
+
+// Get session timeline for a meeting
+router.get('/sessionTimeline/:meetingId', async (req, res) => {
+    try {
+        const { meetingId } = req.params;
+        const meetingDoc = await MeetingParticipantDB.findOne({ meetingId });
+        
+        if (!meetingDoc) {
+            return res.status(404).json({ 
+                error: "Meeting not found",
+                message: `No meeting found with ID: ${meetingId}` 
+            });
+        }
+        
+        res.json({
+            meetingId,
+            sessionTimeline: meetingDoc.sessionTimeline || {},
+            callStartTime: meetingDoc.callStartTime,
+            participants: meetingDoc.participants
+        });
+    } catch (error) {
+        console.error("Error fetching session timeline:", error);
+        res.status(500).json({ 
+            error: "Server error",
+            message: "Failed to fetch session timeline" 
+        });
+    }
+});
 
 export default router; 
