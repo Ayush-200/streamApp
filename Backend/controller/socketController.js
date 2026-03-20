@@ -1,38 +1,35 @@
 import { mergeAndDownloadVideo } from "../services/FFmpeg.js";
-import { MeetingDB, MeetingParticipantDB, SessionDB } from "../models/model.js";
+import { MeetingDB, MeetingParticipantDB } from "../models/model.js";
 import { addJobToQueue } from "../services/queueService.js";
+import { 
+  handleUserJoined, 
+  handleUserLeft, 
+  handleUserDisconnect,
+  getMeetingSessions,
+  saveMeetingSessionsToDB,
+  validateSessions,
+  clearMeetingSessions
+} from "../services/sessionTimeline.js";
 
-let current_meeting_id = null;
-let sessionCounters = {}; // Track session counters per meeting
+// Track socket to meeting mapping
+const socketMeetingMap = new Map();
 
 export function socketHandler(io) {
-        io.on("connection", (socket) => {
+    io.on("connection", (socket) => {
         console.log("socket connected:", socket.id);
 
         // client tells which meeting they belong to
-        socket.on("join_meeting", async ({ meetingId, userId, sessionId }) => {
+        socket.on("join_meeting", async ({ meetingId, userId }) => {
             try {
-                current_meeting_id = meetingId;
                 socket.join(meetingId);
+                socketMeetingMap.set(socket.id, meetingId);
         
-                console.log(`${socket.id} joined meeting: ${meetingId} with sessionId: ${sessionId}`);
+                console.log(`${socket.id} joined meeting: ${meetingId}`);
 
-                // Create session record in database
-                try {
-                    const newSession = await SessionDB.create({
-                        sessionId: sessionId,
-                        meetingId: meetingId,
-                        userId: userId,
-                        startTime: new Date(),
-                        endTime: null
-                    });
-                    console.log(`✅ Session created: ${sessionId}`);
-                } catch (sessionError) {
-                    console.error("Error creating session:", sessionError);
-                }
+                // Track session timeline
+                handleUserJoined(meetingId, userId, socket.id);
 
                 // Add participant to DB if not already present
-                const participant = await MeetingDB.findOne({})
                 const meetingDoc = await MeetingParticipantDB.findOne({ meetingId });
                 if (!meetingDoc) {
                     await MeetingParticipantDB.create({
@@ -51,19 +48,6 @@ export function socketHandler(io) {
                     }
                 }
 
-                // Increment session counter for this meeting
-                if (!sessionCounters[meetingId]) {
-                    sessionCounters[meetingId] = 1;
-                } else {
-                    sessionCounters[meetingId]++;
-                }
-
-                // Broadcast updated session counter to all clients in the meeting
-                io.to(meetingId).emit("session_counter_updated", {
-                    meetingId: meetingId,
-                    counter: sessionCounters[meetingId]
-                });
-
                 // Acknowledge join
                 socket.emit("joined_meeting", meetingId);
 
@@ -73,93 +57,90 @@ export function socketHandler(io) {
             }
         });
 
+        // Handle explicit user leave
+        socket.on("leave_meeting", ({ meetingId, userId }) => {
+            try {
+                console.log(`User ${userId} explicitly leaving meeting ${meetingId}`);
+                handleUserLeft(meetingId, userId);
+                socket.leave(meetingId);
+            } catch (err) {
+                console.error("Error in leave_meeting:", err);
+            }
+        });
 
         socket.on("start_recording", (meetingId) => {
-            console.log("tello")
             console.log("start_recording from:", socket.id);
             io.to(meetingId).emit("start_recording");
-
         });
 
         socket.on("participant_count", (count) => {
-            console.log("the count is");
-            console.log(count);
+            console.log("the count is", count);
         });
-
-
 
         socket.on("stop_recording", async (meetingId) => {
             console.log("stop_recording from:", socket.id);
             await addJobToQueue(meetingId);
             io.to(meetingId).emit("stop_recording");
+        });
 
+        // Get session timeline for a meeting
+        socket.on("get_session_timeline", (meetingId) => {
+            try {
+                const sessions = getMeetingSessions(meetingId);
+                socket.emit("session_timeline", { meetingId, sessions });
+                console.log(`📊 Sent session timeline for meeting ${meetingId}`);
+            } catch (err) {
+                console.error("Error getting session timeline:", err);
+                socket.emit("session_timeline_error", "Failed to get session timeline");
+            }
+        });
+
+        // End meeting and save sessions
+        socket.on("end_meeting", async (meetingId) => {
+            try {
+                console.log(`🏁 Ending meeting ${meetingId}`);
+                
+                // Validate sessions before saving
+                const validation = validateSessions(meetingId);
+                if (!validation.valid) {
+                    console.error("Session validation failed:", validation.errors);
+                }
+                
+                // Save to database
+                const sessions = await saveMeetingSessionsToDB(meetingId);
+                
+                // Broadcast final timeline to all participants
+                io.to(meetingId).emit("meeting_ended", { 
+                    meetingId, 
+                    sessions,
+                    validation 
+                });
+                
+                // Clear from memory
+                clearMeetingSessions(meetingId);
+                
+                console.log(`✅ Meeting ${meetingId} ended and sessions saved`);
+            } catch (err) {
+                console.error("Error ending meeting:", err);
+                socket.emit("end_meeting_error", "Failed to end meeting");
+            }
         });
 
         socket.on("merge_and_download_videos", async(meetingId) => { 
-            console.log("merge and downlaod video socket triggered");
+            console.log("merge and download video socket triggered");
             // mergeAndDownloadVideo(meetingId);
-           
-        })
+        });
 
         socket.on("disconnect", () => {
             console.log("socket disconnected:", socket.id);
-            if (current_meeting_id) {
-                // updateParticipantCount(current_meeting_id, io);
-            }
-        });
-
-        // Handle session end when user leaves
-        socket.on("leave_meeting", async ({ sessionId, meetingId, userId }) => {
-            try {
-                // Update session endTime
-                const session = await SessionDB.findOneAndUpdate(
-                    { sessionId: sessionId },
-                    { endTime: new Date() },
-                    { new: true }
-                );
-                
-                if (session) {
-                    console.log(`✅ Session ended: ${sessionId}`);
-                    
-                    // Increment counter and create new session for rejoin
-                    if (!sessionCounters[meetingId]) {
-                        sessionCounters[meetingId] = 1;
-                    } else {
-                        sessionCounters[meetingId]++;
-                    }
-                    
-                    const newSessionId = `${userId}_${sessionCounters[meetingId]}`;
-                    
-                    // Create new session record for potential rejoin
-                    const newSession = await SessionDB.create({
-                        sessionId: newSessionId,
-                        meetingId: meetingId,
-                        userId: userId,
-                        startTime: new Date(),
-                        endTime: null
-                    });
-                    
-                    console.log(`✅ New session created for rejoin: ${newSessionId}`);
-                    
-                    // Broadcast updated counter and new sessionId to the user
-                    socket.emit("session_rejoined", {
-                        newSessionId: newSessionId,
-                        counter: sessionCounters[meetingId]
-                    });
-                    
-                    // Broadcast updated counter to all clients in the meeting
-                    io.to(meetingId).emit("session_counter_updated", {
-                        meetingId: meetingId,
-                        counter: sessionCounters[meetingId]
-                    });
-                } else {
-                    console.log(`⚠️ Session not found: ${sessionId}`);
-                }
-            } catch (error) {
-                console.error("Error ending session:", error);
+            
+            // Handle unexpected disconnect
+            const meetingId = socketMeetingMap.get(socket.id);
+            if (meetingId) {
+                handleUserDisconnect(meetingId, socket.id);
+                socketMeetingMap.delete(socket.id);
             }
         });
     });
-
 }
 
