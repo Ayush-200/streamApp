@@ -1,4 +1,4 @@
-import {React, useState} from 'react'
+import {React, useState, useRef} from 'react'
 import { useNavigate } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import { FaPlus, FaPhone, FaCalendarAlt, FaClock, FaPlay, FaPause } from 'react-icons/fa';
@@ -19,6 +19,7 @@ const Home = ({ setJoin }) => {
 
   const [meetings, setMeeting] = useState([]);
   const [uploadingMeetings, setUploadingMeetings] = useState({}); // Track upload state per meeting
+  const uploadingMeetingsRef = useRef({}); // Use ref to track current state in async functions
 
    useEffect(() => {
      
@@ -43,14 +44,16 @@ const Home = ({ setJoin }) => {
   const handleUploadToggle = async (meetingName, e) => {
     e.stopPropagation(); // Prevent navigation when clicking the button
     
-    const isCurrentlyUploading = uploadingMeetings[meetingName];
+    const isCurrentlyUploading = uploadingMeetingsRef.current[meetingName];
     
     if (isCurrentlyUploading) {
       // Pause upload
+      uploadingMeetingsRef.current[meetingName] = false;
       setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
       console.log(`⏸️ Paused upload for meeting: ${meetingName}`);
     } else {
       // Start/Resume upload
+      uploadingMeetingsRef.current[meetingName] = true;
       setUploadingMeetings(prev => ({ ...prev, [meetingName]: true }));
       console.log(`▶️ Starting upload for meeting: ${meetingName}`);
       
@@ -61,13 +64,18 @@ const Home = ({ setJoin }) => {
   
   // Continuous upload loop for a meeting
   const startUploadLoop = async (meetingName) => {
-    while (uploadingMeetings[meetingName]) {
+    console.log("hey start upload loop")
+    console.log("Upload state:", uploadingMeetingsRef.current[meetingName])
+    
+    while (uploadingMeetingsRef.current[meetingName]) {
+      console.log("inside while loop");
       try {
         await uploadOldestSegment(meetingName, emailId);
         
         // Check if there are more segments to upload
         if (!isUploadInProgress()) {
           // No more segments, stop uploading
+          uploadingMeetingsRef.current[meetingName] = false;
           setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
           console.log(`✅ All segments uploaded for meeting: ${meetingName}`);
           break;
@@ -77,6 +85,7 @@ const Home = ({ setJoin }) => {
         await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (error) {
         console.error(`Error uploading segment for ${meetingName}:`, error);
+        uploadingMeetingsRef.current[meetingName] = false;
         setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
         break;
       }
@@ -84,24 +93,8 @@ const Home = ({ setJoin }) => {
   };
 
 
-  // Sample upcoming meetings data
-  const upcomingMeetings = [
-    {
-      title: "Team Sync: Sprint Planning & Updates",
-      time: "10:00 AM",
-      duration: "1h 30m"
-    },
-    {
-      title: "Client Presentation Review",
-      time: "2:00 PM",
-      duration: "1h"
-    },
-    {
-      title: "Product Demo with Engineering",
-      time: "4:30 PM",
-      duration: "45m"
-    }
-  ];
+  // Sample upcoming meetings data (unused, can be removed)
+  // const upcomingMeetings = [...]
 
   return (
     <div className='bg-black text-[#3F88C5] min-h-screen flex flex-col'>
