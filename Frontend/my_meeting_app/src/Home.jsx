@@ -20,6 +20,7 @@ const Home = ({ setJoin }) => {
   const [meetings, setMeeting] = useState([]);
   const [uploadingMeetings, setUploadingMeetings] = useState({}); // Track upload state per meeting
   const uploadingMeetingsRef = useRef({}); // Use ref to track current state in async functions
+  const meetingIdCache = useRef({}); // Cache meetingId lookups
 
    useEffect(() => {
      
@@ -41,6 +42,35 @@ const Home = ({ setJoin }) => {
    }, [user, isAuthenticated, isLoading])
   
   // Handle upload toggle for a specific meeting
+  // Fetch meetingId from meetingName
+  const getMeetingIdFromName = async (meetingName) => {
+    // Check cache first
+    if (meetingIdCache.current[meetingName]) {
+      return meetingIdCache.current[meetingName];
+    }
+    
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/getMeetingId/${encodeURIComponent(meetingName)}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch meetingId for ${meetingName}`);
+      }
+      
+      const data = await response.json();
+      const meetingId = data.meetingId;
+      
+      // Cache the result
+      meetingIdCache.current[meetingName] = meetingId;
+      
+      return meetingId;
+    } catch (error) {
+      console.error(`Error fetching meetingId for ${meetingName}:`, error);
+      throw error;
+    }
+  };
+
   const handleUploadToggle = async (meetingName, e) => {
     e.stopPropagation(); // Prevent navigation when clicking the button
     
@@ -57,20 +87,30 @@ const Home = ({ setJoin }) => {
       setUploadingMeetings(prev => ({ ...prev, [meetingName]: true }));
       console.log(`▶️ Starting upload for meeting: ${meetingName}`);
       
-      // Start continuous upload loop
-      startUploadLoop(meetingName);
+      // Fetch meetingId and start upload loop
+      try {
+        const meetingId = await getMeetingIdFromName(meetingName);
+        console.log(`Fetched meetingId: ${meetingId} for meeting: ${meetingName}`);
+        startUploadLoop(meetingName, meetingId);
+      } catch (error) {
+        console.error(`Failed to start upload for ${meetingName}:`, error);
+        uploadingMeetingsRef.current[meetingName] = false;
+        setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
+        alert(`Failed to start upload: ${error.message}`);
+      }
     }
   };
   
   // Continuous upload loop for a meeting
-  const startUploadLoop = async (meetingName) => {
+  const startUploadLoop = async (meetingName, meetingId) => {
     console.log("hey start upload loop")
     console.log("Upload state:", uploadingMeetingsRef.current[meetingName])
+    console.log("Using meetingId:", meetingId)
     
     while (uploadingMeetingsRef.current[meetingName]) {
-      console.log("inside while loop");
+      console.log("inside while loop", meetingId);
       try {
-        await uploadOldestSegment(meetingName, emailId);
+        await uploadOldestSegment(meetingId, emailId); // Use meetingId instead of meetingName
         
         // Check if there are more segments to upload
         if (!isUploadInProgress()) {
