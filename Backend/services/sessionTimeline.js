@@ -16,7 +16,7 @@ export function initializeMeeting(meetingId) {
     });
     console.log(`📊 Initialized session tracking for meeting: ${meetingId}`);
   }
-  return meetingSessions.get(meetingId); 
+  return meetingSessions.get(meetingId);  
 }
 
 /**
