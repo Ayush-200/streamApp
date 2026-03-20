@@ -79,4 +79,18 @@ router.get('/sessions/:meetingId', async (req, res) => {
     }
 });
 
+// Get ALL sessions (for debugging)
+router.get('/sessions', async (req, res) => {
+    try {
+        const allSessions = await SessionDB.find({});
+        res.json({
+            count: allSessions.length,
+            sessions: allSessions
+        });
+    } catch (error) {
+        console.error("Error fetching all sessions:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
 export default router; 
