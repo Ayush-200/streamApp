@@ -12,7 +12,7 @@
   } from "@stream-io/video-react-sdk";
 
   import { useEffect, useState } from "react";
-  import { useParams } from "react-router-dom";
+  import { useParams, useNavigate } from "react-router-dom";
   import  socket  from './utils/socket.js';
   import { useAuth0 } from "@auth0/auth0-react";
   import {startRecording, stopRecording, cleanupRecording, isRecordingActive } from './utils/recording.js';
@@ -25,9 +25,67 @@
     const [call, setCall] = useState(null);
     const { meetingName } = useParams();
     const { user, isLoading, isAuthenticated } = useAuth0();
+    const navigate = useNavigate();
 
     const handleSubmit = () => {
       setShowParticipantList(!showParticipantList);
+    };
+
+    // Manual leave function for testing
+    const handleManualLeave = () => {
+      console.log("🧪 [TEST] Manual leave button clicked");
+      console.log("👤 [TEST] User:", user?.email);
+      console.log("📍 [TEST] Meeting:", meetingName);
+      
+      if (user?.email && meetingName) {
+        console.log("📡 [TEST] Emitting leave_meeting event...");
+        socket.emit("leave_meeting", { meetingId: meetingName, userId: user.email });
+        console.log("✅ [TEST] Event emitted");
+      } else {
+        console.error("❌ [TEST] Missing user or meeting info");
+      }
+    };
+
+    // Proper hangup function
+    const handleHangup = async () => {
+      console.log("📞 [HANGUP] ========== LEAVING MEETING ==========");
+      
+      try {
+        // Stop recording if active
+        if (isRecordingActive()) {
+          console.log("🛑 [HANGUP] Stopping active recording...");
+          cleanupRecording();
+        }
+        
+        // Emit leave_meeting event
+        if (user?.email && meetingName) {
+          console.log("📡 [HANGUP] Emitting leave_meeting event...");
+          socket.emit("leave_meeting", { meetingId: meetingName, userId: user.email });
+        }
+        
+        // Leave the call first (this handles media cleanup internally)
+        if (call) {
+          console.log("📞 [HANGUP] Leaving call...");
+          await call.leave();
+        }
+        
+        // Clean up client
+        if (client) {
+          console.log("🧹 [HANGUP] Disconnecting client...");
+          await client.disconnectUser();
+        }
+        
+        console.log("✅ [HANGUP] Cleanup complete");
+        
+      } catch (error) {
+        console.error("❌ [HANGUP] Error during hangup:", error);
+      } finally {
+        // Always navigate, even if there's an error
+        console.log("🏠 [HANGUP] Navigating to /home...");
+        navigate('/home', { replace: true });
+      }
+      
+      console.log("📞 [HANGUP] ========== LEAVE COMPLETE ==========\n");
     };
 
     function handleRecord(){
@@ -103,18 +161,38 @@
     
     useEffect(() => {
       if (!call || !user) return;
+      
       console.log("🎬 [MEETING_UI] ========== SETTING UP MEETING ==========");
       console.log("👤 [MEETING_UI] User:", user.email);
       console.log("📍 [MEETING_UI] Meeting:", meetingName);
       console.log("🎙️ [MEETING_UI] Recording:", recording);
+      console.log("🔌 [MEETING_UI] Socket connected:", socket.connected);
       
       // Set meeting name in db.js for global access
       setMeetingName(meetingName);
 
-      console.log("📡 [MEETING_UI] Emitting join_meeting event...");
-      socket.emit("join_meeting", {meetingId: meetingName, userId: user.email});
+      // Function to emit join_meeting
+      const emitJoinMeeting = () => {
+        console.log("📡 [MEETING_UI] Emitting join_meeting event...");
+        socket.emit("join_meeting", {meetingId: meetingName, userId: user.email});
+      };
 
-    
+      // Wait for socket to be connected before emitting
+      if (socket.connected) {
+        console.log("✅ [MEETING_UI] Socket already connected, emitting immediately");
+        emitJoinMeeting();
+      } else {
+        console.log("⏳ [MEETING_UI] Socket not connected, waiting for connection...");
+        
+        // Listen for connection and then emit
+        const handleConnect = () => {
+          console.log("✅ [MEETING_UI] Socket connected, now emitting join_meeting");
+          emitJoinMeeting();
+          socket.off("connect", handleConnect); // Remove listener after use
+        };
+        
+        socket.on("connect", handleConnect);
+      }
 
       socket.on("start_recording", () =>{
         console.log("🔴 [MEETING_UI] start_recording event received");
@@ -160,11 +238,17 @@
     // Cleanup when component unmounts or user leaves
     useEffect(() => {
       return () => {
+        console.log("🧹 [CLEANUP] Component unmounting...");
+        
         // If recording is active when leaving, stop and upload
         if (isRecordingActive()) {
-          console.log("User leaving meeting, stopping recording and uploading...");
+          console.log("🛑 [CLEANUP] Stopping recording...");
           cleanupRecording();
         }
+        
+        // Note: Media tracks are cleaned up by call.leave() in handleHangup
+        // Don't try to access camera.getStream() here as it may cause errors
+        console.log("✅ [CLEANUP] Cleanup complete");
       };
     }, []);
 
@@ -198,18 +282,16 @@
       };
     }, [recording, user, meetingName]);
 
-    // Handle cleanup when call ends or user navigates away
+    // Handle cleanup when user navigates away using browser back button
     useEffect(() => {
       if (!call) return;
 
-      const handleCleanup = () => {
-        console.log("🔙 [NAVIGATION] popstate/navigation event triggered");
+      const handlePopState = () => {
+        console.log("🔙 [NAVIGATION] Browser back button pressed");
         
         // Emit leave_meeting on navigation
         if (user?.email && meetingName) {
           console.log("📡 [NAVIGATION] Emitting leave_meeting");
-          console.log("👤 [NAVIGATION] User:", user.email);
-          console.log("📍 [NAVIGATION] Meeting:", meetingName);
           socket.emit("leave_meeting", { meetingId: meetingName, userId: user.email });
         }
         
@@ -219,11 +301,10 @@
         }
       };
 
-      window.addEventListener('popstate', handleCleanup);
+      window.addEventListener('popstate', handlePopState);
 
       return () => {
-        handleCleanup();
-        window.removeEventListener('popstate', handleCleanup);
+        window.removeEventListener('popstate', handlePopState);
       };
     }, [call, user, meetingName]);
 
@@ -252,6 +333,9 @@
                   <CallControls />
                   <button className="bg-amber-400 p-2 rounded-full" onClick={() => handleRecord()}>
                     record
+                  </button>
+                  <button className="bg-red-600 hover:bg-red-700 p-3 px-6 rounded-lg text-white font-semibold" onClick={handleHangup}>
+                    Leave Call
                   </button>
                   <button
                     onClick={handleSubmit}
