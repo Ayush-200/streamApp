@@ -14,7 +14,7 @@ import { addMeetingName } from '../utils/addMeetingName.js';
 import { uploadBlob } from '../utils/uploadBlob.js';
 import multer from 'multer';
 import {getMeetingId} from '../utils/getMeetingId.js';
-import { MeetingParticipantDB } from '../models/model.js';
+import { SessionDB } from '../models/model.js';
 
 // Setup multer for memory storage
 const upload = multer({ storage: multer.memoryStorage() });
@@ -53,33 +53,29 @@ router.post('/uploadChunk/:meetingId', upload.single('file'), uploadBlob);
 
 router.get('/getMeetingId/:meetingName', getMeetingId);
 
-router.post('/uploadSegment/:meetingId', upload.single('file'), uploadBlob); // Reuse uploadBlob handler
+router.post('/uploadSegment/:meetingId', upload.single('file'), uploadBlob);
 
-// Get session timeline for a meeting
-router.get('/sessionTimeline/:meetingId', async (req, res) => {
+// Get sessions for a meeting
+router.get('/sessions/:meetingId', async (req, res) => {
     try {
         const { meetingId } = req.params;
-        const meetingDoc = await MeetingParticipantDB.findOne({ meetingId });
+        const sessionDoc = await SessionDB.findOne({ meetingId });
         
-        if (!meetingDoc) {
+        if (!sessionDoc) {
             return res.status(404).json({ 
-                error: "Meeting not found",
-                message: `No meeting found with ID: ${meetingId}` 
+                error: "No sessions found",
+                meetingId 
             });
         }
         
         res.json({
             meetingId,
-            sessionTimeline: meetingDoc.sessionTimeline || {},
-            callStartTime: meetingDoc.callStartTime,
-            participants: meetingDoc.participants
+            callStartTime: sessionDoc.callStartTime,
+            sessions: sessionDoc.sessions
         });
     } catch (error) {
-        console.error("Error fetching session timeline:", error);
-        res.status(500).json({ 
-            error: "Server error",
-            message: "Failed to fetch session timeline" 
-        });
+        console.error("Error fetching sessions:", error);
+        res.status(500).json({ error: "Server error" });
     }
 });
 
