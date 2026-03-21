@@ -8,13 +8,10 @@ const fetchMeetings = async(emailId) => {
         date: data.date[i]
     }))
 
-    // console.log(combined);
+    // Sort by date (oldest first)
     combined.sort((a, b) => a.date - b.date);
 
-    // Get only the top 4
-    const topFour = combined.slice(0, 4);
-
-    return topFour;
+    return combined;
 
 };
 

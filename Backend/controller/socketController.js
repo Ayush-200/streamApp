@@ -4,6 +4,9 @@ import { addJobToQueue } from "../services/queueService.js";
 // Track meeting start times
 const meetingStartTimes = new Map();
 
+// Track recording state per meeting
+const meetingRecordingState = new Map();
+
 export function socketHandler(io) {
     io.on("connection", (socket) => {
         console.log("✅ Socket connected:", socket.id);
@@ -12,8 +15,8 @@ export function socketHandler(io) {
         socket.on("join_meeting", async ({ meetingId, userId }) => {
             try {
                 console.log(`\n🚪 ========== JOIN_MEETING ==========`);
-                console.log(`👤 User: ${userId}`);
-                console.log(`📍 Meeting: ${meetingId}`);
+                console.log(`� User: ${userId}`);
+                console.log(`�📍 Meeting: ${meetingId}`);
                 console.log(`🔌 Socket: ${socket.id}`);
                 
                 socket.join(meetingId);
@@ -99,8 +102,12 @@ export function socketHandler(io) {
                     }
                 }
 
-                socket.emit("joined_meeting", meetingId);
-                console.log(`✅ JOIN COMPLETE\n`);
+                // Check if recording is already in progress for this meeting
+                const isRecording = meetingRecordingState.get(meetingId) || false;
+                console.log(`🎥 Recording state for ${meetingId}: ${isRecording}`);
+
+                socket.emit("joined_meeting", { meetingId, isRecording });
+                console.log(`✅ JOIN COMPLETE (recording: ${isRecording})\n`);
 
             } catch (err) {
                 console.error("❌ ========== ERROR IN JOIN_MEETING ==========");
@@ -176,13 +183,26 @@ export function socketHandler(io) {
         });
 
         socket.on("start_recording", (meetingId) => {
-            console.log("start_recording from:", socket.id);
+            console.log(`🔴 start_recording from: ${socket.id} for meeting: ${meetingId}`);
+            
+            // Set recording state for this meeting
+            meetingRecordingState.set(meetingId, true);
+            console.log(`✅ Recording state set to TRUE for meeting: ${meetingId}`);
+            
+            // Broadcast to all users in the meeting
             io.to(meetingId).emit("start_recording");
         });
 
         socket.on("stop_recording", async (meetingId) => {
-            console.log("stop_recording from:", socket.id);
+            console.log(`⏹️ stop_recording from: ${socket.id} for meeting: ${meetingId}`);
+            
+            // Clear recording state for this meeting
+            meetingRecordingState.set(meetingId, false);
+            console.log(`✅ Recording state set to FALSE for meeting: ${meetingId}`);
+            
             await addJobToQueue(meetingId);
+            
+            // Broadcast to all users in the meeting
             io.to(meetingId).emit("stop_recording");
         });
 
