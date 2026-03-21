@@ -15,7 +15,7 @@
   import { useParams, useNavigate } from "react-router-dom";
   import  socket  from './utils/socket.js';
   import { useAuth0 } from "@auth0/auth0-react";
-  import {startRecording, stopRecording, cleanupRecording, isRecordingActive } from './utils/recording.js';
+  import {startRecording, stopRecording, cleanupRecording, isRecordingActive, saveCurrentBlobAndStop } from './utils/recording.js';
   import { setMeetingName } from './db/db.js';
   const apiKey = "55gcbd3wd3nk";
 
@@ -23,6 +23,7 @@
     const [client, setClient] = useState(null);
     const [recording, setRecording] = useState(false);
     const [call, setCall] = useState(null);
+    const [isLeaving, setIsLeaving] = useState(false);
     const { meetingName } = useParams();
     const { user, isLoading, isAuthenticated } = useAuth0();
     const navigate = useNavigate();
@@ -50,11 +51,15 @@
     const handleHangup = async () => {
       console.log("📞 [HANGUP] ========== LEAVING MEETING ==========");
       
+      // Show loading state
+      setIsLeaving(true);
+      
       try {
-        // Stop recording if active
+        // Save current recording blob if active
         if (isRecordingActive()) {
-          console.log("🛑 [HANGUP] Stopping active recording...");
-          cleanupRecording();
+          console.log("💾 [HANGUP] Saving current recording blob to IndexedDB...");
+          await saveCurrentBlobAndStop();
+          console.log("✅ [HANGUP] Recording blob saved successfully");
         }
         
         // Emit leave_meeting event
@@ -202,6 +207,7 @@
 
       socket.on("stop_recording", () =>{
         console.log("⏹️ [MEETING_UI] stop_recording event received");
+        setRecording(false);
         stopRecording(meetingName);
         
       })
@@ -211,8 +217,16 @@
       window.location.href = `${import.meta.env.VITE_BACKEND_URL}${url}`;
       })
       
-      socket.on("joined_meeting", (meetingId) => {
+      socket.on("joined_meeting", ({ meetingId, isRecording }) => {
         console.log("✅ [MEETING_UI] joined_meeting confirmation for:", meetingId);
+        console.log("🎥 [MEETING_UI] Recording in progress:", isRecording);
+        
+        // If recording is already in progress, start recording for this user
+        if (isRecording && !isRecordingActive()) {
+          console.log("🔴 [MEETING_UI] Auto-starting recording for newly joined user");
+          setRecording(true);
+          startRecording(meetingName, user?.email);
+        }
       });
 
       // Cleanup function when user leaves
@@ -357,6 +371,17 @@
                 {showParticipantList && <CallParticipantsList />}
               </div>
             </div>
+
+            {/* Loading Overlay */}
+            {isLeaving && (
+              <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
+                <div className="bg-slate-800 p-8 rounded-xl shadow-2xl flex flex-col items-center gap-4">
+                  <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#FFBA08]"></div>
+                  <p className="text-white text-xl font-semibold">Saving recording...</p>
+                  <p className="text-gray-400 text-sm">Please wait while we save your data</p>
+                </div>
+              </div>
+            )}
           </StreamTheme>
         </StreamCall>
       </StreamVideo>
