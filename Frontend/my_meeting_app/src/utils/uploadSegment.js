@@ -18,6 +18,8 @@ export async function uploadOldestSegment(meetingId, userEmail) {
       .equals(meetingId)
       .toArray();
     
+    console.log(`📊 [UPLOAD] Total segments in IndexedDB for meeting ${meetingId}: ${allSegments.length}`);
+    
     if (allSegments.length === 0) {
       console.log("✅ [UPLOAD] No segments to upload");
       return;
@@ -25,6 +27,9 @@ export async function uploadOldestSegment(meetingId, userEmail) {
     
     // Filter out segments that are currently being uploaded
     const availableSegments = allSegments.filter(s => !activeUploads.has(s.segmentIndex));
+    
+    console.log(`📊 [UPLOAD] Available segments (not currently uploading): ${availableSegments.length}`);
+    console.log(`📊 [UPLOAD] Currently uploading: ${activeUploads.size} segments`);
     
     if (availableSegments.length === 0) {
       console.log("⚠️ [UPLOAD] All segments are currently being uploaded");
@@ -37,6 +42,7 @@ export async function uploadOldestSegment(meetingId, userEmail) {
       .slice(0, MAX_CONCURRENT_UPLOADS);
     
     console.log(`📤 [UPLOAD] Uploading ${segmentsToUpload.length} segments in parallel`);
+    console.log(`📤 [UPLOAD] Segment indices: ${segmentsToUpload.map(s => s.segmentIndex).join(', ')}`);
     
     // Upload segments in parallel
     const uploadPromises = segmentsToUpload.map(segment => 
@@ -44,6 +50,14 @@ export async function uploadOldestSegment(meetingId, userEmail) {
     );
     
     await Promise.allSettled(uploadPromises);
+    
+    // Log remaining segments after upload
+    const remainingSegments = await db.chunks
+      .where('meetingId')
+      .equals(meetingId)
+      .toArray();
+    
+    console.log(`📊 [UPLOAD] Remaining segments in IndexedDB after upload: ${remainingSegments.length}`);
     
   } catch (error) {
     console.error(`❌ [UPLOAD ERROR]:`, error);
@@ -114,4 +128,20 @@ async function uploadSingleSegment(segment, meetingId, userEmail) {
 
 export function isUploadInProgress() {
   return activeUploads.size > 0;
+}
+
+// Check if there are any segments remaining in IndexedDB for a meeting
+export async function hasRemainingSegments(meetingId) {
+  try {
+    const count = await db.chunks
+      .where('meetingId')
+      .equals(meetingId)
+      .count();
+    
+    console.log(`📊 [CHECK] Remaining segments for meeting ${meetingId}: ${count}`);
+    return count > 0;
+  } catch (error) {
+    console.error(`❌ [CHECK ERROR]:`, error);
+    return false;
+  }
 }

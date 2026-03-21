@@ -5,7 +5,7 @@ import { FaPlus, FaPhone, FaCalendarAlt, FaClock, FaPlay, FaPause } from 'react-
 import { MdFiberManualRecord } from 'react-icons/md';
 import { useEffect } from 'react';
 import fetchMeetings from './utils/fetchMeeting.js';
-import { uploadOldestSegment, isUploadInProgress } from './utils/uploadSegment.js';
+import { uploadOldestSegment, isUploadInProgress, hasRemainingSegments } from './utils/uploadSegment.js';
 
 const Home = ({ setJoin }) => {
 
@@ -103,33 +103,42 @@ const Home = ({ setJoin }) => {
   
   // Continuous upload loop for a meeting
   const startUploadLoop = async (meetingName, meetingId) => {
-    console.log("hey start upload loop")
-    console.log("Upload state:", uploadingMeetingsRef.current[meetingName])
-    console.log("Using meetingId:", meetingId)
+    console.log("🔄 [UPLOAD_LOOP] Starting upload loop");
+    console.log("📊 [UPLOAD_LOOP] Upload state:", uploadingMeetingsRef.current[meetingName]);
+    console.log("📊 [UPLOAD_LOOP] Using meetingId:", meetingId);
     
     while (uploadingMeetingsRef.current[meetingName]) {
-      console.log("inside while loop", meetingId);
+      console.log("\n🔁 [UPLOAD_LOOP] Loop iteration for:", meetingId);
+      
       try {
-        await uploadOldestSegment(meetingId, emailId); // Use meetingId instead of meetingName
+        // Upload segments (up to 3 in parallel)
+        await uploadOldestSegment(meetingId, emailId);
         
         // Check if there are more segments to upload
-        if (!isUploadInProgress()) {
+        const hasMore = await hasRemainingSegments(meetingId);
+        console.log(`📊 [UPLOAD_LOOP] Has more segments: ${hasMore}`);
+        
+        if (!hasMore) {
           // No more segments, stop uploading
           uploadingMeetingsRef.current[meetingName] = false;
           setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
-          console.log(`✅ All segments uploaded for meeting: ${meetingName}`);
+          console.log(`✅ [UPLOAD_LOOP] All segments uploaded for meeting: ${meetingName}`);
           break;
         }
         
-        // Wait a bit before next upload
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait a bit before next batch upload
+        console.log("⏳ [UPLOAD_LOOP] Waiting 2 seconds before next batch...");
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
       } catch (error) {
-        console.error(`Error uploading segment for ${meetingName}:`, error);
+        console.error(`❌ [UPLOAD_LOOP] Error uploading segment for ${meetingName}:`, error);
         uploadingMeetingsRef.current[meetingName] = false;
         setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
         break;
       }
     }
+    
+    console.log("🏁 [UPLOAD_LOOP] Upload loop ended for:", meetingName);
   };
 
 
