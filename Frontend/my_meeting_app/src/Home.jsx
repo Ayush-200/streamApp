@@ -31,8 +31,8 @@ const Home = ({ setJoin }) => {
      
      const loadMeetings = async () => {
        try {
-         const topFour = await fetchMeetings(emailId);
-         setMeeting(topFour);
+         const allMeetings = await fetchMeetings(emailId);
+         setMeeting(allMeetings);
        } catch (error) {
          console.error("Error fetching meetings:", error);
        }
@@ -216,7 +216,7 @@ const Home = ({ setJoin }) => {
           </h3>
           
           {meetings.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {meetings.map((m, i) => (
                 <div
                   key={i}

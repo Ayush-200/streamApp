@@ -31,14 +31,18 @@ const ParticipantSchema = new mongoose.Schema({
 const meetingParticipantSchema = new mongoose.Schema({
   meetingId: { type: String, required: true },
   participantCount: {type: Number, default: 0},
-  participants: { type: [ParticipantSchema], default: [] },
-  sessionTimeline: { type: Object, default: {} }, // Store session timeline data
-  callStartTime: { type: Date } // When the call started
+  participants: { type: [ParticipantSchema], default: [] }
 });
 
-   export const User = mongoose.model('User', userSchema);
-   export const MeetingDB = mongoose.model('Meeting', meetingSchema);
-   export const MeetingParticipantDB = mongoose.model('MeetingParticipant', meetingParticipantSchema);
-//    export const VideoSchemaDB = mongoose.model('VideoSchemaDB', VideoSchema);
-//    export default {User, MeetingDB};
+// New Sessions Schema
+const sessionSchema = new mongoose.Schema({
+  meetingId: { type: String, required: true, index: true },
+  callStartTime: { type: Date, required: true },
+  sessions: { type: Object, required: true } // Format: { "userA": [{ sessionId, start, end }], "userB": [...] }
+}, { timestamps: true });
+
+export const User = mongoose.model('User', userSchema);
+export const MeetingDB = mongoose.model('Meeting', meetingSchema);
+export const MeetingParticipantDB = mongoose.model('MeetingParticipant', meetingParticipantSchema);
+export const SessionDB = mongoose.model('Session', sessionSchema);
  

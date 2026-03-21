@@ -48,13 +48,21 @@ app.get("/", (req, res) => {
 // Load routes normally (NOT inside DB connect)
 app.use('/', router);
 
-// SOCKET.IO
+// SOCKET.IO - Allow both frontend URLs
 const io = new Server(server, {
   cors: {
-    origin: "https://streamapp-webapp.onrender.com",
+    origin: [
+      "https://streamapp-webapp.onrender.com",
+      "http://localhost:5173",
+      "http://localhost:3000"
+    ],
     methods: ["GET", "POST"],
-    credentials: true
-  }
+    credentials: true,
+    allowedHeaders: ["*"]
+  },
+  transports: ['websocket', 'polling'], // Allow both transports
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 socketHandler(io);

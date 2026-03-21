@@ -162,3 +162,55 @@ export function cleanupRecording() {
     currentStream = null;
   }
 }
+
+// Save current recording blob immediately and return a promise
+export async function saveCurrentBlobAndStop() {
+  return new Promise((resolve, reject) => {
+    try {
+      if (!isRecording || !mediaRecorder) {
+        console.log("⚠️ No active recording to save");
+        resolve();
+        return;
+      }
+
+      console.log("💾 [SAVE_BLOB] Saving current recording blob...");
+      
+      // Set flag to stop recording
+      isRecording = false;
+
+      // Clear the timeout
+      if (stopTimeout) {
+        clearTimeout(stopTimeout);
+        stopTimeout = null;
+      }
+
+      // If recorder is recording, stop it and wait for onstop event
+      if (mediaRecorder.state === "recording") {
+        // The onstop handler will save the blob to IndexedDB
+        mediaRecorder.addEventListener('stop', () => {
+          console.log("✅ [SAVE_BLOB] Current blob saved to IndexedDB");
+          
+          // Stop media tracks
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+          }
+          
+          resolve();
+        }, { once: true });
+
+        mediaRecorder.stop();
+      } else {
+        // Already stopped
+        if (currentStream) {
+          currentStream.getTracks().forEach(track => track.stop());
+          currentStream = null;
+        }
+        resolve();
+      }
+    } catch (error) {
+      console.error("❌ [SAVE_BLOB] Error saving blob:", error);
+      reject(error);
+    }
+  });
+}
