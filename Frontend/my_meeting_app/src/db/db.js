@@ -18,8 +18,9 @@ export function getMeetingName() {
 }
 
 // Store for meeting chunks
-db.version(5).stores({
-  chunks: "++id, userId, meetingId, segmentIndex, timestamp, retries, uploaded" // segmentIndex groups chunks into 60s segments
+// Version 6: Added compound unique index [meetingId+segmentIndex] to prevent duplicates
+db.version(6).stores({
+  chunks: "id, userId, meetingId, segmentIndex, [meetingId+segmentIndex], timestamp, retries, uploaded"
 });
 
 // Ensure database is opened

@@ -5,7 +5,7 @@ import { FaPlus, FaPhone, FaCalendarAlt, FaClock, FaPlay, FaPause } from 'react-
 import { MdFiberManualRecord } from 'react-icons/md';
 import { useEffect } from 'react';
 import fetchMeetings from './utils/fetchMeeting.js';
-import { uploadOldestSegment, isUploadInProgress, hasRemainingSegments } from './utils/uploadSegment.js';
+import { uploadOldestSegment, hasRemainingSegments } from './utils/uploadSegment.js';
 
 const Home = ({ setJoin }) => {
 
@@ -21,6 +21,8 @@ const Home = ({ setJoin }) => {
   const [uploadingMeetings, setUploadingMeetings] = useState({}); // Track upload state per meeting
   const uploadingMeetingsRef = useRef({}); // Use ref to track current state in async functions
   const meetingIdCache = useRef({}); // Cache meetingId lookups
+  const currentUploadingMeeting = useRef(null); // Track which meeting is currently uploading
+  const runningLoops = useRef(new Set()); // Track which loops are actually running
 
    useEffect(() => {
      
@@ -77,25 +79,48 @@ const Home = ({ setJoin }) => {
     const isCurrentlyUploading = uploadingMeetingsRef.current[meetingName];
     
     if (isCurrentlyUploading) {
-      // Pause upload
+      // Pause upload for this meeting
       uploadingMeetingsRef.current[meetingName] = false;
       setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
+      currentUploadingMeeting.current = null;
       console.log(`⏸️ Paused upload for meeting: ${meetingName}`);
     } else {
-      // Start/Resume upload
+      // Check if another meeting is currently uploading
+      if (currentUploadingMeeting.current && currentUploadingMeeting.current !== meetingName) {
+        const previousMeeting = currentUploadingMeeting.current;
+        console.log(`🔄 Switching upload from ${previousMeeting} to ${meetingName}`);
+        
+        // Immediately stop the previous meeting's upload
+        uploadingMeetingsRef.current[previousMeeting] = false;
+        setUploadingMeetings(prev => ({ ...prev, [previousMeeting]: false }));
+      }
+      
+      // ✅ CRITICAL: Check if loop already running BEFORE any async operations
+      if (runningLoops.current.has(meetingName)) {
+        console.log(`⚠️ Upload loop already running for: ${meetingName}`);
+        return;
+      }
+      
+      // ✅ Mark as running IMMEDIATELY to prevent race condition
+      runningLoops.current.add(meetingName);
+      
+      // Start upload for this meeting
       uploadingMeetingsRef.current[meetingName] = true;
       setUploadingMeetings(prev => ({ ...prev, [meetingName]: true }));
+      currentUploadingMeeting.current = meetingName;
       console.log(`▶️ Starting upload for meeting: ${meetingName}`);
       
       // Fetch meetingId and start upload loop
       try {
         const meetingId = await getMeetingIdFromName(meetingName);
         console.log(`Fetched meetingId: ${meetingId} for meeting: ${meetingName}`);
-        startUploadLoop(meetingName, meetingId);
+        await startUploadLoop(meetingName, meetingId);
       } catch (error) {
         console.error(`Failed to start upload for ${meetingName}:`, error);
         uploadingMeetingsRef.current[meetingName] = false;
         setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
+        currentUploadingMeeting.current = null;
+        runningLoops.current.delete(meetingName); // ✅ Cleanup on error
         alert(`Failed to start upload: ${error.message}`);
       }
     }
@@ -103,42 +128,53 @@ const Home = ({ setJoin }) => {
   
   // Continuous upload loop for a meeting
   const startUploadLoop = async (meetingName, meetingId) => {
+    // Note: runningLoops.add() is already called in handleUploadToggle
+    
     console.log("🔄 [UPLOAD_LOOP] Starting upload loop");
     console.log("📊 [UPLOAD_LOOP] Upload state:", uploadingMeetingsRef.current[meetingName]);
     console.log("📊 [UPLOAD_LOOP] Using meetingId:", meetingId);
     
-    while (uploadingMeetingsRef.current[meetingName]) {
-      console.log("\n🔁 [UPLOAD_LOOP] Loop iteration for:", meetingId);
-      
-      try {
-        // Upload segments (up to 3 in parallel)
-        await uploadOldestSegment(meetingId, emailId);
+    try {
+      while (uploadingMeetingsRef.current[meetingName]) {
+        console.log("\n🔁 [UPLOAD_LOOP] Loop iteration for:", meetingId);
         
-        // Check if there are more segments to upload
-        const hasMore = await hasRemainingSegments(meetingId);
-        console.log(`📊 [UPLOAD_LOOP] Has more segments: ${hasMore}`);
-        
-        if (!hasMore) {
-          // No more segments, stop uploading
+        try {
+          // Upload segments (up to 3 in parallel)
+          await uploadOldestSegment(meetingId, emailId);
+          
+          // Check if there are more segments to upload
+          const hasMore = await hasRemainingSegments(meetingId);
+          console.log(`📊 [UPLOAD_LOOP] Has more segments: ${hasMore}`);
+          
+          if (!hasMore) {
+            // No more segments, stop uploading
+            uploadingMeetingsRef.current[meetingName] = false;
+            setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
+            console.log(`✅ [UPLOAD_LOOP] All segments uploaded for meeting: ${meetingName}`);
+            break;
+          }
+          
+          // Wait a bit before next batch upload
+          console.log("⏳ [UPLOAD_LOOP] Waiting 2 seconds before next batch...");
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+        } catch (error) {
+          console.error(`❌ [UPLOAD_LOOP] Error uploading segment for ${meetingName}:`, error);
           uploadingMeetingsRef.current[meetingName] = false;
           setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
-          console.log(`✅ [UPLOAD_LOOP] All segments uploaded for meeting: ${meetingName}`);
           break;
         }
-        
-        // Wait a bit before next batch upload
-        console.log("⏳ [UPLOAD_LOOP] Waiting 2 seconds before next batch...");
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-      } catch (error) {
-        console.error(`❌ [UPLOAD_LOOP] Error uploading segment for ${meetingName}:`, error);
-        uploadingMeetingsRef.current[meetingName] = false;
-        setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
-        break;
       }
+    } finally {
+      // ✅ Always remove from running loops (even if error occurs)
+      runningLoops.current.delete(meetingName);
+      
+      // Clear current uploading meeting if this was it
+      if (currentUploadingMeeting.current === meetingName) {
+        currentUploadingMeeting.current = null;
+      }
+      console.log("🏁 [UPLOAD_LOOP] Upload loop ended for:", meetingName);
     }
-    
-    console.log("🏁 [UPLOAD_LOOP] Upload loop ended for:", meetingName);
   };
 
 
@@ -217,51 +253,86 @@ const Home = ({ setJoin }) => {
           
           {meetings.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {meetings.map((m, i) => (
-                <div
-                  key={i}
-                  onClick={() => navigate(`/meeting/${m.meeting}`)}
-                  className="cursor-pointer p-4 bg-slate-700 rounded-lg border border-slate-600 hover:border-[#FFBA08] hover:bg-slate-600 transition-all duration-300 group relative"
-                >
-                  <div className='flex items-start justify-between mb-2'>
-                    <MdFiberManualRecord className='text-[#3F88C5] group-hover:text-[#FFBA08] mt-1' />
-                    <span className='text-xs text-gray-400'>
+              {meetings.map((m, i) => {
+                const isThisMeetingUploading = uploadingMeetings[m.meeting];
+                const isAnotherMeetingUploading = currentUploadingMeeting.current && currentUploadingMeeting.current !== m.meeting;
+                
+                return (
+                  <div
+                    key={i}
+                    onClick={() => navigate(`/meeting/${m.meeting}`)}
+                    className={`cursor-pointer p-4 bg-slate-700 rounded-lg border transition-all duration-300 group relative ${
+                      isThisMeetingUploading 
+                        ? 'border-[#FFBA08] ring-2 ring-[#FFBA08] ring-opacity-50' 
+                        : isAnotherMeetingUploading
+                        ? 'border-slate-600 opacity-60'
+                        : 'border-slate-600 hover:border-[#FFBA08] hover:bg-slate-600'
+                    }`}
+                  >
+                    <div className='flex items-start justify-between mb-2'>
+                      <MdFiberManualRecord className={`mt-1 ${
+                        isThisMeetingUploading 
+                          ? 'text-[#FFBA08] animate-pulse' 
+                          : 'text-[#3F88C5] group-hover:text-[#FFBA08]'
+                      }`} />
+                      <span className='text-xs text-gray-400'>
+                        {new Date(m.date).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <p className={`font-semibold mb-1 ${
+                      isThisMeetingUploading 
+                        ? 'text-[#FFBA08]' 
+                        : 'text-white group-hover:text-[#FFBA08]'
+                    }`}>
+                      {m.meeting}
+                    </p>
+                    <p className="text-sm text-gray-400 mb-3">
                       {new Date(m.date).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        year: "numeric",
                         month: "short",
                         day: "numeric",
                       })}
-                    </span>
-                  </div>
-                  <p className="font-semibold text-white group-hover:text-[#FFBA08] mb-1">
-                    {m.meeting}
-                  </p>
-                  <p className="text-sm text-gray-400 mb-3">
-                    {new Date(m.date).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </p>
-                  
-                  {/* Upload Segment Button */}
-                  <button
-                    onClick={(e) => handleUploadToggle(m.meeting, e)}
-                    className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-300 ${
-                      uploadingMeetings[m.meeting]
-                        ? 'bg-[#D00000] hover:bg-red-700'
-                        : 'bg-[#FFBA08] hover:bg-[#FF7A30]'
-                    }`}
-                    title={uploadingMeetings[m.meeting] ? 'Pause Upload' : 'Upload Segments'}
-                  >
-                    {uploadingMeetings[m.meeting] ? (
-                      <FaPause className='text-white text-sm' />
-                    ) : (
-                      <FaPlay className='text-[#032B43] text-sm' />
+                    </p>
+                    
+                    {/* Upload status indicator */}
+                    {isThisMeetingUploading && (
+                      <div className="absolute top-3 left-3 bg-[#FFBA08] text-[#032B43] text-xs font-bold px-2 py-1 rounded">
+                        UPLOADING
+                      </div>
                     )}
-                  </button>
-                </div>
-              ))}
+                    
+                    {/* Upload Segment Button */}
+                    <button
+                      onClick={(e) => handleUploadToggle(m.meeting, e)}
+                      disabled={isAnotherMeetingUploading}
+                      className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-300 ${
+                        isThisMeetingUploading
+                          ? 'bg-[#D00000] hover:bg-red-700'
+                          : isAnotherMeetingUploading
+                          ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                          : 'bg-[#FFBA08] hover:bg-[#FF7A30]'
+                      }`}
+                      title={
+                        isAnotherMeetingUploading 
+                          ? `Another meeting is uploading. Click to switch to ${m.meeting}` 
+                          : isThisMeetingUploading 
+                          ? 'Pause Upload' 
+                          : 'Upload Segments'
+                      }
+                    >
+                      {isThisMeetingUploading ? (
+                        <FaPause className='text-white text-sm' />
+                      ) : (
+                        <FaPlay className='text-[#032B43] text-sm' />
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className='text-center py-8'>

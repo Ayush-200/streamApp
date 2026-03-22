@@ -93,8 +93,13 @@ function startSegmentRecording(stream, meetingName, userEmail, segmentIndex) {
         await db.open();
       } 
 
-      // Save to IndexedDB
-      await db.chunks.add({
+      // Create unique composite key to prevent duplicates
+      const uniqueId = `${meetingName}_${segmentIndex}`;
+      console.log(`🔑 [STEP 4.5] Using unique ID: ${uniqueId}`);
+
+      // Use put instead of add to handle duplicates (will replace if exists)
+      await db.chunks.put({
+        id: uniqueId, // Unique composite key
         userId: userEmail,
         blob: segmentBlob,
         meetingId: meetingName,
@@ -104,7 +109,7 @@ function startSegmentRecording(stream, meetingName, userEmail, segmentIndex) {
         uploaded: false
       });
 
-      console.log(`✅ [STEP 5] Segment ${segmentIndex} saved to IndexedDB with type: ${segmentBlob.type}`);
+      console.log(`✅ [STEP 5] Segment ${segmentIndex} saved to IndexedDB with unique ID: ${uniqueId}`);
 
       // Trigger upload (non-blocking)
       if (!isUploadInProgress()) {
