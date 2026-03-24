@@ -1,11 +1,12 @@
-import {React, useState, useRef} from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import { FaPlus, FaPhone, FaCalendarAlt, FaClock, FaPlay, FaPause } from 'react-icons/fa';
 import { MdFiberManualRecord } from 'react-icons/md';
 import { useEffect } from 'react';
 import fetchMeetings from './utils/fetchMeeting.js';
-import { uploadOldestSegment, hasRemainingSegments } from './utils/uploadSegment.js';
+import { uploadOldestSegment } from './utils/uploadSegment.js';
+import { db } from './db/db.js';
 
 const Home = ({ setJoin }) => {
 
@@ -23,6 +24,7 @@ const Home = ({ setJoin }) => {
   const meetingIdCache = useRef({}); // Cache meetingId lookups
   const currentUploadingMeeting = useRef(null); // Track which meeting is currently uploading
   const runningLoops = useRef(new Set()); // Track which loops are actually running
+  const [uploadProgress, setUploadProgress] = useState({}); // Track upload progress per meeting
 
    useEffect(() => {
      
@@ -135,22 +137,83 @@ const Home = ({ setJoin }) => {
     console.log("📊 [UPLOAD_LOOP] Using meetingId:", meetingId);
     
     try {
+      // Get initial count
+      const initialCount = await db.chunks
+        .where('meetingId')
+        .equals(meetingId)
+        .count();
+      
+      console.log(`📊 [UPLOAD_LOOP] Total segments to upload: ${initialCount}`);
+      
+      let uploadedCount = 0;
+      
       while (uploadingMeetingsRef.current[meetingName]) {
         console.log("\n🔁 [UPLOAD_LOOP] Loop iteration for:", meetingId);
         
         try {
+          // Get current segment count before upload
+          const beforeCount = await db.chunks
+            .where('meetingId')
+            .equals(meetingId)
+            .count();
+          
+          // Update progress
+          setUploadProgress(prev => ({
+            ...prev,
+            [meetingName]: {
+              total: initialCount,
+              remaining: beforeCount,
+              uploaded: initialCount - beforeCount,
+              percentage: initialCount > 0 ? Math.round(((initialCount - beforeCount) / initialCount) * 100) : 0,
+              status: 'uploading'
+            }
+          }));
+          
           // Upload segments (up to 3 in parallel)
           await uploadOldestSegment(meetingId, emailId);
           
+          // Get count after upload to see how many were uploaded
+          const afterCount = await db.chunks
+            .where('meetingId')
+            .equals(meetingId)
+            .count();
+          
+          uploadedCount = initialCount - afterCount;
+          
+          console.log(`📊 [UPLOAD_LOOP] Progress: ${uploadedCount}/${initialCount} segments uploaded`);
+          
           // Check if there are more segments to upload
-          const hasMore = await hasRemainingSegments(meetingId);
-          console.log(`📊 [UPLOAD_LOOP] Has more segments: ${hasMore}`);
+          const hasMore = afterCount > 0;
+          console.log(`📊 [UPLOAD_LOOP] Has more segments: ${hasMore} (${afterCount} remaining)`);
           
           if (!hasMore) {
-            // No more segments, stop uploading
+            // No more segments, upload complete!
             uploadingMeetingsRef.current[meetingName] = false;
             setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
+            
+            // Set final progress
+            setUploadProgress(prev => ({
+              ...prev,
+              [meetingName]: {
+                total: initialCount,
+                remaining: 0,
+                uploaded: initialCount,
+                percentage: 100,
+                status: 'completed'
+              }
+            }));
+            
             console.log(`✅ [UPLOAD_LOOP] All segments uploaded for meeting: ${meetingName}`);
+            
+            // Clear progress after 3 seconds
+            setTimeout(() => {
+              setUploadProgress(prev => {
+                const newProgress = { ...prev };
+                delete newProgress[meetingName];
+                return newProgress;
+              });
+            }, 3000);
+            
             break;
           }
           
@@ -160,11 +223,43 @@ const Home = ({ setJoin }) => {
           
         } catch (error) {
           console.error(`❌ [UPLOAD_LOOP] Error uploading segment for ${meetingName}:`, error);
+          
+          // Set error status
+          setUploadProgress(prev => ({
+            ...prev,
+            [meetingName]: {
+              ...prev[meetingName],
+              status: 'error',
+              error: error.message
+            }
+          }));
+          
           uploadingMeetingsRef.current[meetingName] = false;
           setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
           break;
         }
       }
+      
+      // If user paused (uploadingMeetingsRef became false)
+      if (!uploadingMeetingsRef.current[meetingName]) {
+        const remainingCount = await db.chunks
+          .where('meetingId')
+          .equals(meetingId)
+          .count();
+        
+        if (remainingCount > 0) {
+          console.log(`⏸️ [UPLOAD_LOOP] Upload paused with ${remainingCount} segments remaining`);
+          
+          setUploadProgress(prev => ({
+            ...prev,
+            [meetingName]: {
+              ...prev[meetingName],
+              status: 'paused'
+            }
+          }));
+        }
+      }
+      
     } finally {
       // ✅ Always remove from running loops (even if error occurs)
       runningLoops.current.delete(meetingName);
@@ -302,6 +397,52 @@ const Home = ({ setJoin }) => {
                     {isThisMeetingUploading && (
                       <div className="absolute top-3 left-3 bg-[#FFBA08] text-[#032B43] text-xs font-bold px-2 py-1 rounded">
                         UPLOADING
+                      </div>
+                    )}
+                    
+                    {/* Upload Progress Bar */}
+                    {uploadProgress[m.meeting] && (
+                      <div className="mt-3 mb-2">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs text-gray-300 font-medium">
+                            {uploadProgress[m.meeting].status === 'uploading' && '⏳ Uploading...'}
+                            {uploadProgress[m.meeting].status === 'completed' && '✅ Complete!'}
+                            {uploadProgress[m.meeting].status === 'paused' && '⏸️ Paused'}
+                            {uploadProgress[m.meeting].status === 'error' && '❌ Error'}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {uploadProgress[m.meeting].uploaded}/{uploadProgress[m.meeting].total}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-600 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              uploadProgress[m.meeting].status === 'completed' 
+                                ? 'bg-green-500' 
+                                : uploadProgress[m.meeting].status === 'error'
+                                ? 'bg-red-500'
+                                : uploadProgress[m.meeting].status === 'paused'
+                                ? 'bg-gray-400'
+                                : 'bg-[#FFBA08]'
+                            }`}
+                            style={{ width: `${uploadProgress[m.meeting].percentage}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between items-center mt-1">
+                          <span className="text-xs text-gray-400">
+                            {uploadProgress[m.meeting].percentage}%
+                          </span>
+                          {uploadProgress[m.meeting].remaining > 0 && (
+                            <span className="text-xs text-gray-400">
+                              {uploadProgress[m.meeting].remaining} remaining
+                            </span>
+                          )}
+                        </div>
+                        {uploadProgress[m.meeting].error && (
+                          <p className="text-xs text-red-400 mt-1">
+                            {uploadProgress[m.meeting].error}
+                          </p>
+                        )}
                       </div>
                     )}
                     
