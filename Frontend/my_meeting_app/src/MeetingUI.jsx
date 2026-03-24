@@ -62,13 +62,34 @@
           console.log("✅ [HANGUP] Recording blob saved successfully");
         }
         
+        // Stop all media tracks from the call BEFORE leaving
+        if (call) {
+          console.log("📹 [HANGUP] Stopping camera and microphone...");
+          
+          try {
+            // Stop camera
+            await call.camera.disable();
+            console.log("✅ [HANGUP] Camera disabled");
+          } catch (err) {
+            console.warn("⚠️ [HANGUP] Error disabling camera:", err);
+          }
+          
+          try {
+            // Stop microphone
+            await call.microphone.disable();
+            console.log("✅ [HANGUP] Microphone disabled");
+          } catch (err) {
+            console.warn("⚠️ [HANGUP] Error disabling microphone:", err);
+          }
+        }
+        
         // Emit leave_meeting event
         if (user?.email && meetingName) {
           console.log("📡 [HANGUP] Emitting leave_meeting event...");
           socket.emit("leave_meeting", { meetingId: meetingName, userId: user.email });
         }
         
-        // Leave the call first (this handles media cleanup internally)
+        // Leave the call
         if (call) {
           console.log("📞 [HANGUP] Leaving call...");
           await call.leave();
