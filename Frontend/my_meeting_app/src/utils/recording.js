@@ -33,7 +33,22 @@ export async function startRecording(meetingName, userEmail = null) {
     currentMeetingName = meetingName;
     currentUserEmail = userEmail;
     isRecording = true;
-    segmentCounter = 0;
+    
+    // ✅ Initialize counter from existing segments to avoid overwriting
+    const existingSegments = await db.chunks
+      .where('meetingId')
+      .equals(meetingName)
+      .toArray();
+    
+    if (existingSegments.length > 0) {
+      // Find the highest segment index and start from next
+      const maxIndex = Math.max(...existingSegments.map(s => s.segmentIndex));
+      segmentCounter = maxIndex + 1;
+      console.log(`📊 Found ${existingSegments.length} existing segments. Starting from segment ${segmentCounter}`);
+    } else {
+      segmentCounter = 0;
+      console.log(`📊 No existing segments. Starting from segment 0`);
+    }
 
     startSegmentRecording(stream, meetingName, userEmail, segmentCounter);
 
