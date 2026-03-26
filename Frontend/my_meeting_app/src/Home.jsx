@@ -76,53 +76,49 @@ const Home = ({ setJoin }) => {
   };
 
   const handleUploadToggle = async (meetingName, e) => {
-    e.stopPropagation(); // Prevent navigation when clicking the button
+    e.stopPropagation();
     
     const isCurrentlyUploading = uploadingMeetingsRef.current[meetingName];
     
     if (isCurrentlyUploading) {
-      // Pause upload for this meeting
+      // Pause upload
       uploadingMeetingsRef.current[meetingName] = false;
       setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
       currentUploadingMeeting.current = null;
-      console.log(`⏸️ Paused upload for meeting: ${meetingName}`);
+      console.log(`⏸️ Upload paused: ${meetingName}`);
     } else {
-      // Check if another meeting is currently uploading
+      // Check if another meeting is uploading
       if (currentUploadingMeeting.current && currentUploadingMeeting.current !== meetingName) {
         const previousMeeting = currentUploadingMeeting.current;
-        console.log(`🔄 Switching upload from ${previousMeeting} to ${meetingName}`);
+        console.log(`🔄 Switching upload: ${previousMeeting} → ${meetingName}`);
         
-        // Immediately stop the previous meeting's upload
+        // Stop previous upload
         uploadingMeetingsRef.current[previousMeeting] = false;
         setUploadingMeetings(prev => ({ ...prev, [previousMeeting]: false }));
       }
       
-      // ✅ CRITICAL: Check if loop already running BEFORE any async operations
+      // Prevent duplicate loops
       if (runningLoops.current.has(meetingName)) {
-        console.log(`⚠️ Upload loop already running for: ${meetingName}`);
         return;
       }
       
-      // ✅ Mark as running IMMEDIATELY to prevent race condition
       runningLoops.current.add(meetingName);
       
-      // Start upload for this meeting
+      // Start upload
       uploadingMeetingsRef.current[meetingName] = true;
       setUploadingMeetings(prev => ({ ...prev, [meetingName]: true }));
       currentUploadingMeeting.current = meetingName;
-      console.log(`▶️ Starting upload for meeting: ${meetingName}`);
+      console.log(`▶️ Upload started: ${meetingName}`);
       
-      // Fetch meetingId and start upload loop
       try {
         const meetingId = await getMeetingIdFromName(meetingName);
-        console.log(`Fetched meetingId: ${meetingId} for meeting: ${meetingName}`);
         await startUploadLoop(meetingName, meetingId);
       } catch (error) {
-        console.error(`Failed to start upload for ${meetingName}:`, error);
+        console.error(`Upload start failed:`, error);
         uploadingMeetingsRef.current[meetingName] = false;
         setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
         currentUploadingMeeting.current = null;
-        runningLoops.current.delete(meetingName); // ✅ Cleanup on error
+        runningLoops.current.delete(meetingName);
         alert(`Failed to start upload: ${error.message}`);
       }
     }
@@ -130,12 +126,6 @@ const Home = ({ setJoin }) => {
   
   // Continuous upload loop for a meeting
   const startUploadLoop = async (meetingName, meetingId) => {
-    // Note: runningLoops.add() is already called in handleUploadToggle
-    
-    console.log("🔄 [UPLOAD_LOOP] Starting upload loop");
-    console.log("📊 [UPLOAD_LOOP] Upload state:", uploadingMeetingsRef.current[meetingName]);
-    console.log("📊 [UPLOAD_LOOP] Using meetingId:", meetingId);
-    
     try {
       // Get initial count
       const initialCount = await db.chunks
@@ -143,15 +133,11 @@ const Home = ({ setJoin }) => {
         .equals(meetingId)
         .count();
       
-      console.log(`📊 [UPLOAD_LOOP] Total segments to upload: ${initialCount}`);
-      
-      let uploadedCount = 0;
+      console.log(`📊 Upload starting: ${initialCount} segments for ${meetingName}`);
       
       while (uploadingMeetingsRef.current[meetingName]) {
-        console.log("\n🔁 [UPLOAD_LOOP] Loop iteration for:", meetingId);
-        
         try {
-          // Get current segment count before upload
+          // Get current segment count
           const beforeCount = await db.chunks
             .where('meetingId')
             .equals(meetingId)
@@ -172,26 +158,17 @@ const Home = ({ setJoin }) => {
           // Upload segments (up to 3 in parallel)
           await uploadOldestSegment(meetingId, emailId);
           
-          // Get count after upload to see how many were uploaded
+          // Check if done
           const afterCount = await db.chunks
             .where('meetingId')
             .equals(meetingId)
             .count();
           
-          uploadedCount = initialCount - afterCount;
-          
-          console.log(`📊 [UPLOAD_LOOP] Progress: ${uploadedCount}/${initialCount} segments uploaded`);
-          
-          // Check if there are more segments to upload
-          const hasMore = afterCount > 0;
-          console.log(`📊 [UPLOAD_LOOP] Has more segments: ${hasMore} (${afterCount} remaining)`);
-          
-          if (!hasMore) {
-            // No more segments, upload complete!
+          if (afterCount === 0) {
+            // Upload complete
             uploadingMeetingsRef.current[meetingName] = false;
             setUploadingMeetings(prev => ({ ...prev, [meetingName]: false }));
             
-            // Set final progress
             setUploadProgress(prev => ({
               ...prev,
               [meetingName]: {
@@ -203,7 +180,7 @@ const Home = ({ setJoin }) => {
               }
             }));
             
-            console.log(`✅ [UPLOAD_LOOP] All segments uploaded for meeting: ${meetingName}`);
+            console.log(`✅ Upload complete: ${meetingName} (${initialCount} segments)`);
             
             // Clear progress after 3 seconds
             setTimeout(() => {
@@ -217,14 +194,12 @@ const Home = ({ setJoin }) => {
             break;
           }
           
-          // Wait a bit before next batch upload
-          console.log("⏳ [UPLOAD_LOOP] Waiting 2 seconds before next batch...");
+          // Wait before next batch
           await new Promise(resolve => setTimeout(resolve, 2000));
           
         } catch (error) {
-          console.error(`❌ [UPLOAD_LOOP] Error uploading segment for ${meetingName}:`, error);
+          console.error(`❌ Upload error for ${meetingName}:`, error);
           
-          // Set error status
           setUploadProgress(prev => ({
             ...prev,
             [meetingName]: {
@@ -240,7 +215,7 @@ const Home = ({ setJoin }) => {
         }
       }
       
-      // If user paused (uploadingMeetingsRef became false)
+      // Handle pause
       if (!uploadingMeetingsRef.current[meetingName]) {
         const remainingCount = await db.chunks
           .where('meetingId')
@@ -248,8 +223,6 @@ const Home = ({ setJoin }) => {
           .count();
         
         if (remainingCount > 0) {
-          console.log(`⏸️ [UPLOAD_LOOP] Upload paused with ${remainingCount} segments remaining`);
-          
           setUploadProgress(prev => ({
             ...prev,
             [meetingName]: {
@@ -261,14 +234,11 @@ const Home = ({ setJoin }) => {
       }
       
     } finally {
-      // ✅ Always remove from running loops (even if error occurs)
       runningLoops.current.delete(meetingName);
       
-      // Clear current uploading meeting if this was it
       if (currentUploadingMeeting.current === meetingName) {
         currentUploadingMeeting.current = null;
       }
-      console.log("🏁 [UPLOAD_LOOP] Upload loop ended for:", meetingName);
     }
   };
 

@@ -14,7 +14,7 @@ import { addMeetingName } from '../utils/addMeetingName.js';
 import { uploadBlob } from '../utils/uploadBlob.js';
 import multer from 'multer';
 import {getMeetingId} from '../utils/getMeetingId.js';
-import { SessionDB } from '../models/model.js';
+import { SessionDB, MeetingDB, MeetingParticipantDB } from '../models/model.js';
 
 // Setup multer for memory storage
 const upload = multer({ storage: multer.memoryStorage() });
@@ -52,6 +52,67 @@ router.post('/removeMeetingFromSchedule/:emailId', removeMeetingFromSchedule);
 router.post('/uploadChunk/:meetingId', upload.single('file'), uploadBlob);
 
 router.get('/getMeetingId/:meetingName', getMeetingId);
+
+// Get last segment index for a user in a meeting
+router.get('/getLastSegmentIndex/:meetingName/:userId', async (req, res) => {
+    try {
+        const { meetingName, userId } = req.params;
+        
+        console.log(`📊 [GET_LAST_SEGMENT] Request for meeting: ${meetingName}, user: ${userId}`);
+        
+        // Try to find meeting by meetingName first, then by meetingId
+        let meetingDoc = await MeetingDB.findOne({ meetingName });
+        
+        if (!meetingDoc) {
+            // Maybe meetingName is actually a meetingId, try that
+            meetingDoc = await MeetingDB.findOne({ meetingId: meetingName });
+        }
+        
+        if (!meetingDoc) {
+            console.log(`❌ [GET_LAST_SEGMENT] Meeting not found: ${meetingName}`);
+            return res.json({ 
+                lastSegmentIndex: -1,
+                message: "Meeting not found in database"
+            });
+        }
+        
+        const meetingId = meetingDoc.meetingId;
+        console.log(`✅ [GET_LAST_SEGMENT] Found meeting with ID: ${meetingId}`);
+        
+        // Find participant in MeetingParticipant collection
+        const participantDoc = await MeetingParticipantDB.findOne({ meetingId });
+        
+        if (!participantDoc) {
+            console.log(`📊 [GET_LAST_SEGMENT] No participants found for meeting: ${meetingId}`);
+            return res.json({ lastSegmentIndex: -1 });
+        }
+        
+        const participant = participantDoc.participants.find(p => p.userId === userId);
+        
+        if (!participant) {
+            console.log(`📊 [GET_LAST_SEGMENT] User ${userId} not found in participants`);
+            return res.json({ lastSegmentIndex: -1 });
+        }
+        
+        if (participant.lastSegmentIndex === undefined || participant.lastSegmentIndex === null) {
+            console.log(`📊 [GET_LAST_SEGMENT] No lastSegmentIndex set for user ${userId}`);
+            return res.json({ lastSegmentIndex: -1 });
+        }
+        
+        console.log(`✅ [GET_LAST_SEGMENT] Found lastSegmentIndex: ${participant.lastSegmentIndex} for user ${userId}`);
+        
+        res.json({ 
+            lastSegmentIndex: participant.lastSegmentIndex,
+            meetingId: meetingId
+        });
+    } catch (error) {
+        console.error("❌ [GET_LAST_SEGMENT] Error:", error);
+        res.status(500).json({ 
+            error: "Server error",
+            lastSegmentIndex: -1 
+        });
+    }
+});
 
 router.post('/uploadSegment/:meetingId', upload.single('file'), uploadBlob);
 

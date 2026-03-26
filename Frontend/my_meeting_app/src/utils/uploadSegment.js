@@ -5,11 +5,9 @@ const MAX_CONCURRENT_UPLOADS = 3; // Upload up to 3 segments in parallel
 
 export async function uploadOldestSegment(meetingId, userEmail) {
   if (!navigator.onLine) {
-    console.log("❌ [UPLOAD] No internet connection");
+    console.log("❌ No internet connection");
     return;
   }
-  
-  console.log("🚀 [STEP 6] Starting upload process...");
   
   try {
     // Get all segments that haven't been uploaded yet
@@ -18,21 +16,14 @@ export async function uploadOldestSegment(meetingId, userEmail) {
       .equals(meetingId)
       .toArray();
     
-    console.log(`📊 [UPLOAD] Total segments in IndexedDB for meeting ${meetingId}: ${allSegments.length}`);
-    
     if (allSegments.length === 0) {
-      console.log("✅ [UPLOAD] No segments to upload");
       return;
     }
     
     // Filter out segments that are currently being uploaded
     const availableSegments = allSegments.filter(s => !activeUploads.has(s.segmentIndex));
     
-    console.log(`📊 [UPLOAD] Available segments (not currently uploading): ${availableSegments.length}`);
-    console.log(`📊 [UPLOAD] Currently uploading: ${activeUploads.size} segments`);
-    
     if (availableSegments.length === 0) {
-      console.log("⚠️ [UPLOAD] All segments are currently being uploaded");
       return;
     }
     
@@ -41,8 +32,7 @@ export async function uploadOldestSegment(meetingId, userEmail) {
       .sort((a, b) => a.segmentIndex - b.segmentIndex)
       .slice(0, MAX_CONCURRENT_UPLOADS);
     
-    console.log(`📤 [UPLOAD] Uploading ${segmentsToUpload.length} segments in parallel`);
-    console.log(`📤 [UPLOAD] Segment indices: ${segmentsToUpload.map(s => s.segmentIndex).join(', ')}`);
+    console.log(`📤 Uploading ${segmentsToUpload.length} segments: [${segmentsToUpload.map(s => s.segmentIndex).join(', ')}]`);
     
     // Upload segments in parallel
     const uploadPromises = segmentsToUpload.map(segment => 
@@ -51,16 +41,8 @@ export async function uploadOldestSegment(meetingId, userEmail) {
     
     await Promise.allSettled(uploadPromises);
     
-    // Log remaining segments after upload
-    const remainingSegments = await db.chunks
-      .where('meetingId')
-      .equals(meetingId)
-      .toArray();
-    
-    console.log(`📊 [UPLOAD] Remaining segments in IndexedDB after upload: ${remainingSegments.length}`);
-    
   } catch (error) {
-    console.error(`❌ [UPLOAD ERROR]:`, error);
+    console.error(`❌ Upload error:`, error);
   }
 }
 
@@ -71,10 +53,6 @@ async function uploadSingleSegment(segment, meetingId, userEmail) {
   activeUploads.add(segmentIndex);
   
   try {
-    console.log(`📤 [STEP 7] Preparing to upload segment ${segmentIndex}`);
-    console.log(`   - Blob size: ${segment.blob.size} bytes`);
-    console.log(`   - Blob type: ${segment.blob.type}`);
-    
     // Create FormData with proper File object
     const file = new File([segment.blob], `segment-${segmentIndex}.webm`, {
       type: 'video/webm'
@@ -84,11 +62,6 @@ async function uploadSingleSegment(segment, meetingId, userEmail) {
     formData.append("file", file);
     formData.append("userId", userEmail);
     formData.append("chunkIndex", segmentIndex);
-    
-    console.log(`📨 [STEP 8] FormData created for segment ${segmentIndex}`);
-    console.log(`   - File name: ${file.name}`);
-    console.log(`   - File type: ${file.type}`);
-    console.log(`   - File size: ${file.size}`);
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes to match backend
@@ -110,15 +83,13 @@ async function uploadSingleSegment(segment, meetingId, userEmail) {
     }
     
     const result = await response.json();
-    console.log(`✅ [STEP 9] Segment ${segmentIndex} uploaded successfully:`, result);
+    console.log(`✅ Segment ${segmentIndex} uploaded (${(segment.blob.size / 1024 / 1024).toFixed(2)}MB)`);
     
     // Delete segment only after successful upload
     await db.chunks.delete(segment.id);
     
-    console.log(`🗑️ [STEP 10] Deleted segment ${segmentIndex} from IndexedDB`);
-    
   } catch (error) {
-    console.error(`❌ [UPLOAD ERROR] Segment ${segmentIndex}:`, error);
+    console.error(`❌ Segment ${segmentIndex} upload failed:`, error.message);
     throw error; // Re-throw to be caught by Promise.allSettled
   } finally {
     // Remove from active uploads
@@ -138,10 +109,9 @@ export async function hasRemainingSegments(meetingId) {
       .equals(meetingId)
       .count();
     
-    console.log(`📊 [CHECK] Remaining segments for meeting ${meetingId}: ${count}`);
     return count > 0;
   } catch (error) {
-    console.error(`❌ [CHECK ERROR]:`, error);
+    console.error(`❌ Error checking remaining segments:`, error);
     return false;
   }
 }

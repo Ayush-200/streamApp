@@ -5,31 +5,18 @@ export const uploadBlob = async (req, res) => {
     const { userId, chunkIndex } = req.body;
     const blob = req.file;
 
-    console.log(`📥 Upload request - Meeting: ${meetingId}, User: ${userId}, Chunk: ${chunkIndex}`);
-
     if (!blob) {
         console.error("❌ No file uploaded");
         return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // Verify what multer received
-    console.log("=== MULTER FILE INFO ===");
-    console.log("originalname:", blob.originalname);
-    console.log("mimetype:", blob.mimetype);
-    console.log("size:", blob.size);
-    console.log("buffer length:", blob.buffer.length);
-    console.log("First 20 bytes:", blob.buffer.slice(0, 20));
-    console.log("========================");
-
-    console.log(`File received - Size: ${blob.size} bytes, Type: ${blob.mimetype}`);
+    console.log(`📤 Uploading segment ${chunkIndex} for ${meetingId} (${(blob.size / 1024 / 1024).toFixed(2)}MB)`);
 
     try {
         // Convert buffer to base64 for upload_large
         const base64Data = `data:${blob.mimetype};base64,${blob.buffer.toString('base64')}`;
         
-        console.log(`📤 Using upload_large for better handling of video segments`);
-        
-        // Use upload_large which is optimized for large files and supports parallel chunk processing
+        // Use upload_large which is optimized for large files
         const result = await cloudinary.uploader.upload_large(
             base64Data,
             {
@@ -44,15 +31,10 @@ export const uploadBlob = async (req, res) => {
             }
         );
 
-        console.log(`✅ Upload successful - URL: ${result.secure_url}`);
+        console.log(`✅ Segment ${chunkIndex} uploaded to Cloudinary`);
         res.json({ success: true, url: result.secure_url, chunkIndex });
     } catch (err) {
-        console.error(`❌ Error in uploadBlob:`);
-        console.error('Error type:', typeof err);
-        console.error('Error keys:', Object.keys(err));
-        console.error('Full error:', JSON.stringify(err, null, 2));
-        console.error('Error message:', err.message);
-        console.error('Error stack:', err.stack);
+        console.error(`❌ Upload error for segment ${chunkIndex}:`, err.message);
         
         const errorMessage = err.message || err.error?.message || 'Unknown error';
         res.status(500).json({ 

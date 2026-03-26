@@ -83,10 +83,25 @@
           }
         }
         
-        // Emit leave_meeting event
+        // Get lastSegmentIndex from localStorage
+        let lastSegmentIndex = -1;
+        if (user?.email && meetingName) {
+          const storageKey = `lastSegment_${meetingName}_${user.email}`;
+          const storedIndex = localStorage.getItem(storageKey);
+          if (storedIndex !== null) {
+            lastSegmentIndex = parseInt(storedIndex, 10);
+            console.log(`📊 [HANGUP] Last segment index: ${lastSegmentIndex}`);
+          }
+        }
+        
+        // Emit leave_meeting event with lastSegmentIndex
         if (user?.email && meetingName) {
           console.log("📡 [HANGUP] Emitting leave_meeting event...");
-          socket.emit("leave_meeting", { meetingId: meetingName, userId: user.email });
+          socket.emit("leave_meeting", { 
+            meetingId: meetingName, 
+            userId: user.email,
+            lastSegmentIndex: lastSegmentIndex
+          });
         }
         
         // Leave the call
@@ -185,88 +200,78 @@
       init();
     }, [isLoading, isAuthenticated, user, join, meetingName]);
     
+    // Effect 1: Emit join_meeting ONCE when call is ready
     useEffect(() => {
       if (!call || !user) return;
       
-      console.log("🎬 [MEETING_UI] ========== SETTING UP MEETING ==========");
+      console.log("📡 [MEETING_UI] Emitting join_meeting event (once)...");
+      socket.emit("join_meeting", {meetingId: meetingName, userId: user.email});
+      
+    }, [call]); // ← Only runs when call is first set
+    
+    // Effect 2: Setup socket listeners
+    useEffect(() => {
+      if (!call || !user) return;
+      
+      console.log("🎬 [MEETING_UI] ========== SETTING UP SOCKET LISTENERS ==========");
       console.log("👤 [MEETING_UI] User:", user.email);
       console.log("📍 [MEETING_UI] Meeting:", meetingName);
-      console.log("🎙️ [MEETING_UI] Recording:", recording);
-      console.log("🔌 [MEETING_UI] Socket connected:", socket.connected);
       
       // Set meeting name in db.js for global access
       setMeetingName(meetingName);
 
-      // Function to emit join_meeting
-      const emitJoinMeeting = () => {
-        console.log("📡 [MEETING_UI] Emitting join_meeting event...");
-        socket.emit("join_meeting", {meetingId: meetingName, userId: user.email});
+      // ✅ Track if recording has been started to prevent duplicates
+      let recordingStarted = false;
+
+      const handleStartRecording = () => {
+        console.log("🔴 [MEETING_UI] start_recording event received");
+        if (!recordingStarted) {
+          recordingStarted = true;
+          setRecording(true);
+          startRecording(meetingName, user?.email);
+        } else {
+          console.warn("⚠️ [MEETING_UI] Recording already started, ignoring duplicate event");
+        }
       };
 
-      // Wait for socket to be connected before emitting
-      if (socket.connected) {
-        console.log("✅ [MEETING_UI] Socket already connected, emitting immediately");
-        emitJoinMeeting();
-      } else {
-        console.log("⏳ [MEETING_UI] Socket not connected, waiting for connection...");
-        
-        // Listen for connection and then emit
-        const handleConnect = () => {
-          console.log("✅ [MEETING_UI] Socket connected, now emitting join_meeting");
-          emitJoinMeeting();
-          socket.off("connect", handleConnect); // Remove listener after use
-        };
-        
-        socket.on("connect", handleConnect);
-      }
-
-      socket.on("start_recording", () =>{
-        console.log("🔴 [MEETING_UI] start_recording event received");
-        setRecording(true);
-        startRecording(meetingName, user?.email);
-      });
-
-      socket.on("stop_recording", () =>{
+      const handleStopRecording = () => {
         console.log("⏹️ [MEETING_UI] stop_recording event received");
+        recordingStarted = false;
         setRecording(false);
         stopRecording(meetingName);
-        
-      })
+      };
 
-      socket.on("download_ready", ({url}) =>{
-      console.log("📥 [MEETING_UI] download_ready at:", url);
-      window.location.href = `${import.meta.env.VITE_BACKEND_URL}${url}`;
-      })
+      const handleDownloadReady = ({url}) => {
+        console.log("📥 [MEETING_UI] download_ready at:", url);
+        window.location.href = `${import.meta.env.VITE_BACKEND_URL}${url}`;
+      };
       
-      socket.on("joined_meeting", ({ meetingId, isRecording }) => {
+      const handleJoinedMeeting = ({ meetingId, isRecording }) => {
         console.log("✅ [MEETING_UI] joined_meeting confirmation for:", meetingId);
         console.log("🎥 [MEETING_UI] Recording in progress:", isRecording);
         
         // If recording is already in progress, start recording for this user
-        if (isRecording && !isRecordingActive()) {
+        if (isRecording && !recordingStarted && !isRecordingActive()) {
           console.log("🔴 [MEETING_UI] Auto-starting recording for newly joined user");
+          recordingStarted = true;
           setRecording(true);
           startRecording(meetingName, user?.email);
         }
-      });
+      };
+
+      // Add event listeners
+      socket.on("start_recording", handleStartRecording);
+      socket.on("stop_recording", handleStopRecording);
+      socket.on("download_ready", handleDownloadReady);
+      socket.on("joined_meeting", handleJoinedMeeting);
 
       // Cleanup function when user leaves
       return () => {
-        console.log("🚪 [MEETING_UI] ========== CLEANUP: USER LEAVING ==========");
-        console.log("👤 [MEETING_UI] User leaving:", user.email);
-        console.log("📍 [MEETING_UI] From meeting:", meetingName);
-        console.log("📡 [MEETING_UI] Emitting leave_meeting event...");
-        
-        socket.emit("leave_meeting", { meetingId: meetingName, userId: user.email });
-        
         console.log("🧹 [MEETING_UI] Removing socket listeners...");
-        socket.off("start_recording");
-        socket.off("stop_recording");
-        socket.off("join_meeting");
-        socket.off("ready_to_download");
-        
-        console.log("✅ [MEETING_UI] Cleanup complete");
-        console.log("🚪 [MEETING_UI] ========== LEAVE COMPLETE ==========\n");
+        socket.off("start_recording", handleStartRecording);
+        socket.off("stop_recording", handleStopRecording);
+        socket.off("download_ready", handleDownloadReady);
+        socket.off("joined_meeting", handleJoinedMeeting);
       };
     }, [call, meetingName, user]);
 

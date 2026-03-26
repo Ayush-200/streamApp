@@ -21,6 +21,7 @@ const ParticipantSchema = new mongoose.Schema({
   joinTime: { type: Date, required: true },
   leaveTime: { type: Date }, // can be null until they leave
   videoPublicId: { type: String }, // filled after upload
+  lastSegmentIndex: { type: Number, default: -1 }, // Track last recorded segment index
   chunks: [{
     chunkIndex: Number,
     cloudinaryUrl: String,
