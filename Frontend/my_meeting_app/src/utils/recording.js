@@ -8,6 +8,8 @@ let currentMeetingName = null;
 let currentUserEmail = null;
 let segmentCounter = 0;
 let stopTimeout = null;
+let meetingStartTime = null; // Track when meeting recording started
+let currentChunkStartTime = 0; // Track when current chunk started recording
 
 export function isRecordingActive() {
   return isRecording && mediaRecorder && mediaRecorder.state === 'recording';
@@ -39,6 +41,25 @@ export async function startRecording(meetingName, userEmail = null) {
     currentMeetingName = meetingName;
     currentUserEmail = userEmail;
     isRecording = true;
+    
+    // Initialize or restore meeting start time from localStorage
+    const meetingStartKey = `meetingStartTime_${meetingName}_${userEmail}`;
+    const storedStartTime = localStorage.getItem(meetingStartKey);
+    
+    if (storedStartTime) {
+      // Restore existing meeting start time (user rejoined or reloaded)
+      meetingStartTime = parseInt(storedStartTime, 10);
+      console.log(`⏱️ Restored meeting start time from localStorage: ${new Date(meetingStartTime).toISOString()}`);
+      
+      // Calculate current time offset from meeting start (don't reset to 0!)
+      const elapsedTime = (Date.now() - meetingStartTime) / 1000;
+      console.log(`⏱️ Elapsed time since meeting start: ${elapsedTime.toFixed(2)}s`);
+    } else {
+      // First time recording for this meeting
+      meetingStartTime = Date.now();
+      localStorage.setItem(meetingStartKey, meetingStartTime.toString());
+      console.log(`⏱️ Meeting recording started at: ${new Date(meetingStartTime).toISOString()}`);
+    }
     
     // ✅ Multi-layer check for segment counter to prevent overwriting
     // Priority: localStorage → Database → IndexedDB → Start at 0
@@ -117,6 +138,12 @@ function startSegmentRecording(stream, meetingName, userEmail, segmentIndex) {
   const recorder = new MediaRecorder(stream, { mimeType });
 
   let recordedChunks = [];
+  
+  // Track when this chunk starts recording
+  if (meetingStartTime) {
+    currentChunkStartTime = (Date.now() - meetingStartTime) / 1000; // seconds from meeting start
+    console.log(`⏱️ Chunk ${segmentIndex} recording started at ${currentChunkStartTime.toFixed(2)}s`);
+  }
 
   recorder.ondataavailable = (e) => {
     if (e.data && e.data.size > 0) {
@@ -133,6 +160,10 @@ function startSegmentRecording(stream, meetingName, userEmail, segmentIndex) {
 
       const segmentBlob = new Blob(recordedChunks, { type: mimeType });
       console.log(`💾 Saving segment ${segmentIndex} (${(segmentBlob.size / 1024 / 1024).toFixed(2)}MB)`);
+      
+      // Calculate end time for this chunk
+      const chunkEndTime = meetingStartTime ? (Date.now() - meetingStartTime) / 1000 : 0;
+      console.log(`⏱️ Chunk ${segmentIndex} ended at ${chunkEndTime.toFixed(2)}s (duration: ${(chunkEndTime - currentChunkStartTime).toFixed(2)}s)`);
 
       // Ensure database is ready
       if (!db.isOpen()) {
@@ -150,7 +181,10 @@ function startSegmentRecording(stream, meetingName, userEmail, segmentIndex) {
         segmentIndex: segmentIndex,
         timestamp: Date.now(),
         retries: 0,
-        uploaded: false
+        uploaded: false,
+        // Add timing data for session tracking
+        chunkStartTime: currentChunkStartTime,
+        chunkEndTime: chunkEndTime
       });
 
       // ✅ Update localStorage with latest segment index
@@ -203,6 +237,16 @@ export function stopRecording() {
   console.log("🛑 Recording stopped.");
 }
 
+// Clean up meeting start time from localStorage (call when meeting truly ends)
+export function cleanupMeetingStartTime(meetingName, userEmail) {
+  if (meetingName && userEmail) {
+    const meetingStartKey = `meetingStartTime_${meetingName}_${userEmail}`;
+    localStorage.removeItem(meetingStartKey);
+    console.log(`🧹 Cleaned up meeting start time from localStorage for ${meetingName}`);
+  }
+  meetingStartTime = null;
+}
+
 export function cleanupRecording() {
   stopRecording();
 
@@ -210,6 +254,12 @@ export function cleanupRecording() {
     currentStream.getTracks().forEach(track => track.stop());
     currentStream = null;
   }
+  
+  // DON'T clean up meetingStartTime here - it should persist for the entire meeting
+  // Only clean up when meeting actually ends (not when user temporarily leaves)
+  
+  // Reset local timing variable but keep localStorage intact
+  currentChunkStartTime = 0;
 }
 
 // Save current recording blob immediately and return a promise
@@ -239,6 +289,10 @@ export async function saveCurrentBlobAndStop() {
             currentStream = null;
           }
           
+          // DON'T clean up meetingStartTime - it should persist for the entire meeting
+          // Only reset local variable
+          currentChunkStartTime = 0;
+          
           resolve();
         }, { once: true });
 
@@ -248,6 +302,11 @@ export async function saveCurrentBlobAndStop() {
           currentStream.getTracks().forEach(track => track.stop());
           currentStream = null;
         }
+        
+        // DON'T clean up meetingStartTime - it should persist for the entire meeting
+        // Only reset local variable
+        currentChunkStartTime = 0;
+        
         resolve();
       }
     } catch (error) {

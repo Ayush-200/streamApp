@@ -15,7 +15,7 @@
   import { useParams, useNavigate } from "react-router-dom";
   import  socket  from './utils/socket.js';
   import { useAuth0 } from "@auth0/auth0-react";
-  import {startRecording, stopRecording, cleanupRecording, isRecordingActive, saveCurrentBlobAndStop } from './utils/recording.js';
+  import {startRecording, stopRecording, cleanupRecording, isRecordingActive, saveCurrentBlobAndStop, cleanupMeetingStartTime } from './utils/recording.js';
   import { setMeetingName } from './db/db.js';
   const apiKey = "55gcbd3wd3nk";
 
@@ -239,6 +239,9 @@
         recordingStarted = false;
         setRecording(false);
         stopRecording(meetingName);
+        
+        // Clean up meeting start time when recording is stopped by host
+        cleanupMeetingStartTime(meetingName, user?.email);
       };
 
       const handleDownloadReady = ({url}) => {

@@ -116,6 +116,67 @@ router.get('/getLastSegmentIndex/:meetingName/:userId', async (req, res) => {
 
 router.post('/uploadSegment/:meetingId', upload.single('file'), uploadBlob);
 
+// Update chunk timing for session tracking
+router.post('/sessions/update-chunk', async (req, res) => {
+    try {
+        const { meetingId, userEmail, sessionId, start, end } = req.body;
+        
+        console.log(`📊 [UPDATE_CHUNK] Received timing update for ${sessionId}: ${start}s - ${end}s`);
+        
+        // Validate input
+        if (!meetingId || !userEmail || !sessionId || start === undefined || end === undefined) {
+            return res.status(400).json({ 
+                error: "Missing required fields",
+                required: ["meetingId", "userEmail", "sessionId", "start", "end"]
+            });
+        }
+        
+        // Find or create session document
+        let sessionDoc = await SessionDB.findOne({ meetingId });
+        
+        if (!sessionDoc) {
+            console.log(`📊 [UPDATE_CHUNK] Creating new session document for meeting: ${meetingId}`);
+            sessionDoc = new SessionDB({
+                meetingId,
+                callStartTime: new Date(),
+                sessions: {}
+            });
+        }
+        
+        // Initialize user's session array if needed
+        if (!sessionDoc.sessions) {
+            sessionDoc.sessions = {};
+        }
+        if (!sessionDoc.sessions[userEmail]) {
+            sessionDoc.sessions[userEmail] = [];
+        }
+        
+        // Add or update chunk timing
+        const existingIndex = sessionDoc.sessions[userEmail].findIndex(s => s.sessionId === sessionId);
+        
+        if (existingIndex >= 0) {
+            // Update existing entry
+            console.log(`📊 [UPDATE_CHUNK] Updating existing session entry for ${sessionId}`);
+            sessionDoc.sessions[userEmail][existingIndex] = { sessionId, start, end };
+        } else {
+            // Add new entry
+            console.log(`📊 [UPDATE_CHUNK] Adding new session entry for ${sessionId}`);
+            sessionDoc.sessions[userEmail].push({ sessionId, start, end });
+        }
+        
+        // Mark nested object as modified for Mongoose
+        sessionDoc.markModified('sessions');
+        await sessionDoc.save();
+        
+        console.log(`✅ [UPDATE_CHUNK] Session timing saved successfully`);
+        res.json({ success: true });
+        
+    } catch (error) {
+        console.error('❌ [UPDATE_CHUNK] Error updating chunk timing:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Get sessions for a meeting
 router.get('/sessions/:meetingId', async (req, res) => {
     try {

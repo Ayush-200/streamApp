@@ -85,6 +85,38 @@ async function uploadSingleSegment(segment, meetingId, userEmail) {
     const result = await response.json();
     console.log(`✅ Segment ${segmentIndex} uploaded (${(segment.blob.size / 1024 / 1024).toFixed(2)}MB)`);
     
+    // Send timing data to backend for session tracking
+    if (segment.chunkStartTime !== undefined && segment.chunkEndTime !== undefined) {
+      try {
+        const sessionId = `${userEmail}_${segmentIndex + 1}`;
+        console.log(`📊 Updating session timing for ${sessionId}: ${segment.chunkStartTime.toFixed(2)}s - ${segment.chunkEndTime.toFixed(2)}s`);
+        
+        const timingResponse = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/sessions/update-chunk`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              meetingId: meetingId,
+              userEmail: userEmail,
+              sessionId: sessionId,
+              start: segment.chunkStartTime,
+              end: segment.chunkEndTime
+            })
+          }
+        );
+        
+        if (timingResponse.ok) {
+          console.log(`✅ Session timing updated for segment ${segmentIndex}`);
+        } else {
+          console.warn(`⚠️ Failed to update session timing: ${timingResponse.statusText}`);
+        }
+      } catch (timingError) {
+        console.error(`❌ Error updating session timing:`, timingError);
+        // Don't fail the upload if timing update fails
+      }
+    }
+    
     // Delete segment only after successful upload
     await db.chunks.delete(segment.id);
     
