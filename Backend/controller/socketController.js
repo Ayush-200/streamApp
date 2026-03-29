@@ -22,7 +22,8 @@ export function socketHandler(io) {
                     meetingStartTimes.set(meetingId, Date.now());
                 }
 
-                const startTime = Math.floor((Date.now() - meetingStartTimes.get(meetingId)) / 1000);
+                const currentTime = Math.round(((Date.now() - meetingStartTimes.get(meetingId)) / 1000) * 100) / 100;
+                const GRACE_PERIOD = 2; // 2 seconds
 
                 // Find or create session document
                 let sessionDoc = await SessionDB.findOne({ meetingId });
@@ -40,17 +41,31 @@ export function socketHandler(io) {
                     sessionDoc.sessions[userId] = [];
                 }
 
-                // Create new session
-                const sessionId = `${userId}_${sessionDoc.sessions[userId].length + 1}`;
+                // Check for recent session within grace period
+                const recentSession = sessionDoc.sessions[userId]
+                    .slice()
+                    .reverse()
+                    .find(s => s.end !== null && (currentTime - s.end) <= GRACE_PERIOD);
                 
-                sessionDoc.sessions[userId].push({
-                    sessionId,
-                    start: startTime,
-                    end: null
-                });
+                if (recentSession) {
+                    console.log(`🔄 [JOIN] Reopening recent session: ${recentSession.sessionId} (closed ${(currentTime - recentSession.end).toFixed(2)}s ago)`);
+                    recentSession.end = null;
+                    sessionDoc.markModified('sessions');
+                    await sessionDoc.save();
+                } else {
+                    // Create new session
+                    const sessionId = `${userId}_${sessionDoc.sessions[userId].length + 1}`;
+                    
+                    sessionDoc.sessions[userId].push({
+                        sessionId,
+                        start: currentTime,
+                        end: null
+                    });
 
-                sessionDoc.markModified('sessions');
-                await sessionDoc.save();
+                    sessionDoc.markModified('sessions');
+                    await sessionDoc.save();
+                    console.log(`✅ [JOIN] New session created: ${sessionId} at ${currentTime}s`);
+                }
 
                 // Add participant to meeting
                 const meetingDoc = await MeetingParticipantDB.findOne({ meetingId });
@@ -90,7 +105,7 @@ export function socketHandler(io) {
                     return;
                 }
 
-                const endTime = Math.floor((Date.now() - meetingStartTimes.get(meetingId)) / 1000);
+                const endTime = Math.round(((Date.now() - meetingStartTimes.get(meetingId)) / 1000) * 100) / 100;
 
                 // Find session document and close active session
                 const sessionDoc = await SessionDB.findOne({ meetingId });
@@ -125,7 +140,7 @@ export function socketHandler(io) {
                 }
 
                 socket.leave(meetingId);
-                console.log(`✅ ${userId} left (session closed)`);
+                console.log(`✅ ${userId} left (session closed at ${endTime}s)`);
             } catch (err) {
                 console.error("❌ Leave error:", err.message);
             }
@@ -147,7 +162,34 @@ export function socketHandler(io) {
         });
 
         socket.on("disconnect", async () => {
-            console.log("Socket disconnected:", socket.id);
+            console.log("🔌 Socket disconnected:", socket.id);
+            
+            // Find which meeting this socket was in and close active sessions
+            for (const [meetingId, startTime] of meetingStartTimes.entries()) {
+                const sessionDoc = await SessionDB.findOne({ meetingId });
+                
+                if (!sessionDoc) continue;
+                
+                // Find user by checking all sessions
+                let disconnectedUserId = null;
+                for (const [userId, sessions] of Object.entries(sessionDoc.sessions)) {
+                    const activeSession = sessions.find(s => s.end === null);
+                    if (activeSession) {
+                        // Check if this user might be the disconnected socket
+                        // We'll close all active sessions on disconnect
+                        const endTime = Math.round(((Date.now() - startTime) / 1000) * 100) / 100;
+                        activeSession.end = endTime;
+                        disconnectedUserId = userId;
+                        console.log(`🔒 [DISCONNECT] Closed session for ${userId} at ${endTime}s`);
+                    }
+                }
+                
+                if (disconnectedUserId) {
+                    sessionDoc.markModified('sessions');
+                    await sessionDoc.save();
+                    console.log(`✅ [DISCONNECT] Saved session closure for ${disconnectedUserId}`);
+                }
+            }
         });
     });
 }

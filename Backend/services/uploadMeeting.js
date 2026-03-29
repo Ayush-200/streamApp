@@ -48,12 +48,47 @@ export const uploadMeeting =  (async (req, res) => {
         if (allUploaded) {
             console.log("All participants uploaded → merging videos...");
             const videoUrls = meeting.participants.map(p => p.videoPublicId);
+            
+            // Validate video files before processing
+            const validationResults = await Promise.all(
+                videoUrls.map(async (url, index) => {
+                    try {
+                        const response = await fetch(url, { method: 'HEAD' });
+                        if (!response.ok) {
+                            console.error(`❌ Video ${index + 1} not accessible: ${response.status}`);
+                            return false;
+                        }
+                        console.log(`✅ Video ${index + 1} validated`);
+                        return true;
+                    } catch (error) {
+                        console.error(`❌ Video ${index + 1} validation failed:`, error.message);
+                        return false;
+                    }
+                })
+            );
+            
+            if (!validationResults.every(result => result === true)) {
+                return res.status(400).json({ 
+                    error: "Video validation failed",
+                    message: "One or more videos are not accessible"
+                });
+            }
+            
             try{
                 const mergedVideos = await axios.post('http://65.2.52.52:8080/stitch',
-                    { videoUrls: videoUrls})
+                    { 
+                        videoUrls: videoUrls,
+                        options: {
+                            useAudioMixing: true,
+                            reEncode: true,
+                            avSync: true,
+                            minSegmentDuration: 0.1
+                        }
+                    })
                 return res.json({ success: true, mergedVideoUrl: mergedVideos.data.url });
             }catch(err){
                 console.error("Error merging videos:", err);
+                return res.status(500).json({ error: "Video merge failed" });
             }
         }
     } catch (err) {

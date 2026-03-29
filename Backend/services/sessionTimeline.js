@@ -3,6 +3,9 @@ import { MeetingParticipantDB } from "../models/model.js";
 // In-memory store for active sessions per meeting
 const meetingSessions = new Map();
 
+// Grace period for reopening recent sessions (2 seconds)
+const SESSION_GRACE_PERIOD = 2;
+
 export function initializeMeeting(meetingId) {
   console.log(`🔧 [INIT] Checking if meeting ${meetingId} is initialized...`);
   if (!meetingSessions.has(meetingId)) {
@@ -25,9 +28,10 @@ function getRelativeTimestamp(meetingId) {
     console.warn(`⚠️ [TIMESTAMP] No meeting found for ${meetingId}, returning 0`);
     return 0;
   }
-  const relativeTime = Math.floor((Date.now() - meeting.callStartTime) / 1000);
-  console.log(`⏱️ [TIMESTAMP] Relative time for ${meetingId}: ${relativeTime}s`);
-  return relativeTime;
+  const relativeTime = (Date.now() - meeting.callStartTime) / 1000;
+  const rounded = Math.round(relativeTime * 100) / 100;
+  console.log(`⏱️ [TIMESTAMP] Relative time for ${meetingId}: ${rounded}s`);
+  return rounded;
 }
 
 function generateSessionId(userId, sessionCount) {
@@ -51,26 +55,43 @@ export function handleUserJoined(meetingId, userId, socketId) {
     console.log(`📝 [JOIN] User ${userId} has ${meeting.sessions[userId].length} existing session(s)`);
   }
   
+  const currentTime = getRelativeTimestamp(meetingId);
+  
+  // Check for recent session within grace period (2 seconds)
+  const recentSession = meeting.sessions[userId]
+    .slice()
+    .reverse()
+    .find(s => s.end !== null && (currentTime - s.end) <= SESSION_GRACE_PERIOD);
+  
+  if (recentSession) {
+    console.log(`🔄 [JOIN] Reopening recent session: ${recentSession.sessionId} (closed ${(currentTime - recentSession.end).toFixed(2)}s ago)`);
+    recentSession.end = null;
+    meeting.userSocketMap[socketId] = userId;
+    console.log(`✅ [JOIN] Session reopened at ${currentTime}s`);
+    console.log(`🚪 [JOIN] ========== JOIN COMPLETE (REOPENED) ==========\n`);
+    return recentSession;
+  }
+  
+  // Close any active session
   const activeSession = meeting.sessions[userId].find(s => s.end === null);
   if (activeSession) {
     console.warn(`⚠️ [JOIN] User ${userId} already has active session: ${activeSession.sessionId}`);
-    activeSession.end = getRelativeTimestamp(meetingId);
+    activeSession.end = currentTime;
     console.log(`🔒 [JOIN] Closed previous session at ${activeSession.end}s`);
   }
   
   const sessionId = generateSessionId(userId, meeting.sessions[userId].length);
-  const startTime = getRelativeTimestamp(meetingId);
   const newSession = {
     sessionId,
     userId,
-    start: startTime,
+    start: currentTime,
     end: null
   };
   
   meeting.sessions[userId].push(newSession);
   meeting.userSocketMap[socketId] = userId;
   
-  console.log(`✅ [JOIN] Session created: ${sessionId} at ${startTime}s`);
+  console.log(`✅ [JOIN] Session created: ${sessionId} at ${currentTime}s`);
   console.log(`🚪 [JOIN] ========== JOIN COMPLETE ==========\n`);
   
   return newSession;
@@ -214,6 +235,13 @@ export function validateSessions(meetingId) {
       }
       if (session.end !== null && session.end < session.start) {
         errors.push(`${session.sessionId}: negative duration`);
+      }
+      // Reject segments shorter than 0.1 seconds
+      if (session.end !== null) {
+        const duration = session.end - session.start;
+        if (duration < 0.1) {
+          errors.push(`${session.sessionId}: segment too short (${duration.toFixed(3)}s < 0.1s)`);
+        }
       }
     });
     
