@@ -1,14 +1,7 @@
 import { MeetingDB } from '../models/model.js'
 
-export const getAlreadyCreatedMeeting = (async (req, res)=>{
+export const getAlreadyCreatedMeeting = async (req, res) => {
     const meetingName = req.params.meetingName;
     const response = await MeetingDB.findOne({ meetingName });
-    if(!response){
-        console.log("inside false");
-        res.json(false);
-    }
-
-    else{
-        res.json(true);
-    }
-})
+    res.json(!!response);
+}

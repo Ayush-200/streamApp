@@ -1,24 +1,19 @@
 import { MeetingDB } from '../models/model.js'
 import { nanoid } from 'nanoid'
 
-export const addMeetingName = (async(req, res)=>{
-    try{
+export const addMeetingName = async (req, res) => {
     const meetingName = req.params.meetingName;
-    const meetingId = nanoid(12); // Generate unique 12-character ID
+    const meetingId = nanoid(12);
     
     const response = await MeetingDB.create({
-        meetingName: meetingName,
-        meetingId: meetingId
+        meetingName,
+        meetingId
     });
 
-    console.log("meeting added to DB successfully", response);
+    console.log("Meeting added to DB:", meetingId);
     res.status(201).json({
-        message: "meeting added success",
-        meetingId: meetingId,
-        meetingName: meetingName
+        message: "Meeting created successfully",
+        meetingId,
+        meetingName
     });
-    }catch(err){
-        console.log(err);
-        res.status(400).json({message: "there is error in adding meeting in meeting list"});
-    }
-})
+}

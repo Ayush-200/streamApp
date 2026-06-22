@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
+import { useProtectedApi } from './hooks/useProtectedApi.js';
 
 const JoinMeetingForm = () => {
     const [ meetingName, setMeetingName ] = useState("")
@@ -8,6 +9,7 @@ const JoinMeetingForm = () => {
     const [ loading, setLoading ] = useState(false)
     const navigate = useNavigate();
     const { user } = useAuth0();
+    const { protectedGet, protectedPost } = useProtectedApi();
     
     const handleJoinMeeting = async () => {
       if (!meetingName.trim()) {
@@ -21,52 +23,37 @@ const JoinMeetingForm = () => {
       const trimMeetingName = meetingName.trim();
       
       try {
-        // Fetch meetingId from database using meeting name
-        const response = await fetch(
+        const response = await protectedGet(
           `${import.meta.env.VITE_BACKEND_URL}/getMeetingId/${encodeURIComponent(trimMeetingName)}`
         );
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            setError("Meeting not found. Please check the meeting name.");
-          } else {
-            setError("Failed to fetch meeting details. Please try again.");
-          }
-          setLoading(false);
-          return;
-        }
         
         const data = await response.json();
         const meetingId = data.meetingId;
         
         console.log("Joining meeting with ID:", meetingId);
         
-        // Save meeting to user's database when joining
         if (user?.email) {
           try {
-            await fetch(`${import.meta.env.VITE_BACKEND_URL}/addUsersMeetings/${user.email}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                newMeeting: trimMeetingName,
-                newDate: new Date()
-              })
-            });
-            console.log("Meeting saved to user's dashboard");
+            await protectedPost(
+              `${import.meta.env.VITE_BACKEND_URL}/addUsersMeetings/${user.email}`,
+              { newMeeting: trimMeetingName, newDate: new Date() }
+            );
           } catch (error) {
             console.error("Error saving meeting to user:", error);
-            // Don't block joining if saving fails
           }
         }
         
-        // Navigate using meetingId instead of meetingName
         navigate(`/meeting/${meetingId}`);
         
       } catch (error) {
         console.error("Error joining meeting:", error);
-        setError("An error occurred. Please try again.");
+        if (error.message.includes('404')) {
+          setError("Meeting not found. Please check the meeting name.");
+        } else if (error.message.includes('401')) {
+          setError("Authentication failed. Please log in again.");
+        } else {
+          setError("An error occurred. Please try again.");
+        }
       } finally {
         setLoading(false);
       }

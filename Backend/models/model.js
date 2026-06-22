@@ -39,11 +39,23 @@ const meetingParticipantSchema = new mongoose.Schema({
 const sessionSchema = new mongoose.Schema({
   meetingId: { type: String, required: true, index: true },
   callStartTime: { type: Date, required: true },
-  sessions: { type: Object, required: true } // Format: { "userA": [{ sessionId, start, end }], "userB": [...] }
+  sessions: { type: Object, required: true }
 }, { timestamps: true });
+
+// Scheduled Meeting Schema
+const scheduledMeetingSchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  meetingName: { type: String, required: true },
+  scheduledDate: { type: Date, required: true },
+  scheduledTime: { type: String, required: true },
+  description: { type: String, default: '' },
+  status: { type: String, enum: ['scheduled', 'completed', 'cancelled'], default: 'scheduled' },
+  createdAt: { type: Date, default: Date.now }
+});
 
 export const User = mongoose.model('User', userSchema);
 export const MeetingDB = mongoose.model('Meeting', meetingSchema);
 export const MeetingParticipantDB = mongoose.model('MeetingParticipant', meetingParticipantSchema);
 export const SessionDB = mongoose.model('Session', sessionSchema);
+export const ScheduledMeetingDB = mongoose.model('ScheduledMeeting', scheduledMeetingSchema);
  

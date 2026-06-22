@@ -1,9 +1,9 @@
 import { db } from "../db/db.js";
 
-let activeUploads = new Set(); // Track active upload segment indices
-const MAX_CONCURRENT_UPLOADS = 3; // Upload up to 3 segments in parallel
+let activeUploads = new Set();
+const MAX_CONCURRENT_UPLOADS = 3;
 
-export async function uploadOldestSegment(meetingId, userEmail) {
+export async function uploadOldestSegment(meetingId, userEmail, getAccessTokenSilently) {
   if (!navigator.onLine) {
     console.log("❌ No internet connection");
     return;
@@ -36,7 +36,7 @@ export async function uploadOldestSegment(meetingId, userEmail) {
     
     // Upload segments in parallel
     const uploadPromises = segmentsToUpload.map(segment => 
-      uploadSingleSegment(segment, meetingId, userEmail)
+      uploadSingleSegment(segment, meetingId, userEmail, getAccessTokenSilently)
     );
     
     await Promise.allSettled(uploadPromises);
@@ -46,14 +46,18 @@ export async function uploadOldestSegment(meetingId, userEmail) {
   }
 }
 
-async function uploadSingleSegment(segment, meetingId, userEmail) {
+async function uploadSingleSegment(segment, meetingId, userEmail, getAccessTokenSilently) {
   const segmentIndex = segment.segmentIndex;
   
-  // Mark as being uploaded
   activeUploads.add(segmentIndex);
   
   try {
-    // Create FormData with proper File object
+    const token = await getAccessTokenSilently({
+      authorizationParams: {
+        audience: `https://${import.meta.env.VITE_AUTH0_DOMAIN || 'dev-6u7dy62xhf1femi3.us.auth0.com'}/api/v2/`,
+      }
+    });
+    
     const file = new File([segment.blob], `segment-${segmentIndex}.webm`, {
       type: 'video/webm'
     });
@@ -64,12 +68,15 @@ async function uploadSingleSegment(segment, meetingId, userEmail) {
     formData.append("chunkIndex", segmentIndex);
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes to match backend
+    const timeoutId = setTimeout(() => controller.abort(), 600000);
     
     const response = await fetch(
       `${import.meta.env.VITE_BACKEND_URL}/uploadSegment/${meetingId}`,
       {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData,
         signal: controller.signal
       }
@@ -82,12 +89,18 @@ async function uploadSingleSegment(segment, meetingId, userEmail) {
       throw new Error(`Upload failed: ${response.statusText} - ${errorText}`);
     }
     
-    const result = await response.json();
+    // const result = await response.json();
     console.log(`✅ Segment ${segmentIndex} uploaded (${(segment.blob.size / 1024 / 1024).toFixed(2)}MB)`);
     
     // Send timing data to backend for session tracking
     if (segment.chunkStartTime !== undefined && segment.chunkEndTime !== undefined) {
       try {
+        const token = await getAccessTokenSilently({
+          authorizationParams: {
+            audience: `https://${import.meta.env.VITE_AUTH0_DOMAIN || 'dev-6u7dy62xhf1femi3.us.auth0.com'}/api/v2/`,
+          }
+        });
+        
         const sessionId = `${userEmail}_${segmentIndex + 1}`;
         console.log(`📊 Updating session timing for ${sessionId}: ${segment.chunkStartTime.toFixed(2)}s - ${segment.chunkEndTime.toFixed(2)}s`);
         
@@ -95,7 +108,10 @@ async function uploadSingleSegment(segment, meetingId, userEmail) {
           `${import.meta.env.VITE_BACKEND_URL}/sessions/update-chunk`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify({
               meetingId: meetingId,
               userEmail: userEmail,

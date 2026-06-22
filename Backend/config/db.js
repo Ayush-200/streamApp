@@ -5,8 +5,12 @@ const connectDB = async () => {
   try {
     // Assign the connection to a variable
     const conn = await mongoose.connect(
-    process.env.MONGO_URI
-    );
+    process.env.MONGO_URI, 
+    {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000
+    }
+  );
 
     console.log("MongoDB connected!");
     console.log("Cluster host:", conn.connection.host); // cluster host
@@ -16,10 +20,11 @@ const connectDB = async () => {
 
     // List all collections
     const collections = await conn.connection.db.listCollections().toArray();
-    console.log("Collections in DB:", collections.map(c => c.name));
+    // console.log("Collections in DB:", collections.map(c => c.name));
 
   } catch (error) {
     console.error("Error occurred in db.js", error);
+    throw error;
   }
 };
 

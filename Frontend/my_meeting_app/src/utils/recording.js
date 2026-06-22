@@ -5,7 +5,6 @@ let mediaRecorder;
 let currentStream = null;
 let isRecording = false;
 let currentMeetingName = null;
-let currentUserEmail = null;
 let segmentCounter = 0;
 let stopTimeout = null;
 let meetingStartTime = null; // Track when meeting recording started
@@ -19,7 +18,7 @@ export function getCurrentMeetingName() {
   return currentMeetingName;
 }
 
-export async function startRecording(meetingName, userEmail = null) {
+export async function startRecording(meetingName, userEmail = null, getAccessTokenSilently = null) {
   if (!navigator.mediaDevices?.getUserMedia) {
     console.log("❌ getUserMedia not supported!");
     return;
@@ -39,7 +38,6 @@ export async function startRecording(meetingName, userEmail = null) {
 
     currentStream = stream;
     currentMeetingName = meetingName;
-    currentUserEmail = userEmail;
     isRecording = true;
     
     // Initialize or restore meeting start time from localStorage
@@ -77,9 +75,27 @@ export async function startRecording(meetingName, userEmail = null) {
       
       // 2. Check database (source of truth, cross-device)
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_BACKEND_URL}/getLastSegmentIndex/${encodeURIComponent(meetingName)}/${encodeURIComponent(userEmail)}`
-        );
+        let response;
+        if (getAccessTokenSilently) {
+          const token = await getAccessTokenSilently({
+            authorizationParams: {
+              audience: `https://${import.meta.env.VITE_AUTH0_DOMAIN || 'dev-6u7dy62xhf1femi3.us.auth0.com'}/api/v2/`,
+            }
+          });
+          
+          response = await fetch(
+            `${import.meta.env.VITE_BACKEND_URL}/getLastSegmentIndex/${encodeURIComponent(meetingName)}/${encodeURIComponent(userEmail)}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          );
+        } else {
+          response = await fetch(
+            `${import.meta.env.VITE_BACKEND_URL}/getLastSegmentIndex/${encodeURIComponent(meetingName)}/${encodeURIComponent(userEmail)}`
+          );
+        }
         
         if (response.ok) {
           const data = await response.json();
@@ -87,7 +103,6 @@ export async function startRecording(meetingName, userEmail = null) {
             maxSegmentIndex = data.lastSegmentIndex;
             console.log(`📊 Found lastSegmentIndex in database: ${maxSegmentIndex}`);
             
-            // Sync to localStorage
             localStorage.setItem(storageKey, maxSegmentIndex.toString());
           }
         }

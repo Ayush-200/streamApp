@@ -7,11 +7,13 @@ import { useEffect } from 'react';
 import fetchMeetings from './utils/fetchMeeting.js';
 import { uploadOldestSegment } from './utils/uploadSegment.js';
 import { db } from './db/db.js';
+import { useProtectedApi } from './hooks/useProtectedApi.js';
 
 const Home = ({ setJoin }) => {
 
   const navigate = useNavigate();
-  const { user, isAuthenticated, isLoading } = useAuth0();
+  const { user, isAuthenticated, isLoading, getAccessTokenSilently } = useAuth0();
+  const { protectedGet } = useProtectedApi();
   const userName = user?.name || "";
   const emailId = user?.email;
   console.log(userName)
@@ -19,12 +21,13 @@ const Home = ({ setJoin }) => {
   console.log("user in home.jsx", user);
 
   const [meetings, setMeeting] = useState([]);
-  const [uploadingMeetings, setUploadingMeetings] = useState({}); // Track upload state per meeting
-  const uploadingMeetingsRef = useRef({}); // Use ref to track current state in async functions
-  const meetingIdCache = useRef({}); // Cache meetingId lookups
-  const currentUploadingMeeting = useRef(null); // Track which meeting is currently uploading
-  const runningLoops = useRef(new Set()); // Track which loops are actually running
-  const [uploadProgress, setUploadProgress] = useState({}); // Track upload progress per meeting
+  const [nextMeeting, setNextMeeting] = useState(null);
+  const [uploadingMeetings, setUploadingMeetings] = useState({});
+  const uploadingMeetingsRef = useRef({});
+  const meetingIdCache = useRef({});
+  const currentUploadingMeeting = useRef(null);
+  const runningLoops = useRef(new Set());
+  const [uploadProgress, setUploadProgress] = useState({});
 
    useEffect(() => {
      
@@ -33,41 +36,77 @@ const Home = ({ setJoin }) => {
      
      console.log(user.email);
      
-     const loadMeetings = async () => {
-       try {
-         const allMeetings = await fetchMeetings(emailId);
-         setMeeting(allMeetings);
+      const loadMeetings = async () => {
+        try {
+          const allMeetings = await fetchMeetings(emailId, protectedGet);
+          setMeeting(allMeetings);
+        } catch (error) {
+          console.error("Error fetching meetings:", error);
+        }
+      };
+      
+      const loadNextMeeting = async () => {
+        try {
+          const response = await protectedGet(
+            `${import.meta.env.VITE_BACKEND_URL}/scheduledMeetings/${emailId}`
+          );
+         const data = await response.json();
+         const scheduledMeetings = data.meetings || [];
+         
+         const now = new Date();
+         const upcoming = scheduledMeetings
+           .filter(m => m.status === 'scheduled')
+           .filter(m => {
+             const meetingDateTime = new Date(`${m.scheduledDate.split('T')[0]}T${m.scheduledTime}`);
+             return meetingDateTime >= now;
+           })
+           .sort((a, b) => {
+             const dateA = new Date(`${a.scheduledDate.split('T')[0]}T${a.scheduledTime}`);
+             const dateB = new Date(`${b.scheduledDate.split('T')[0]}T${b.scheduledTime}`);
+             return dateA - dateB;
+           });
+         
+         if (upcoming.length > 0) {
+           const next = upcoming[0];
+           const meetingDateTime = new Date(`${next.scheduledDate.split('T')[0]}T${next.scheduledTime}`);
+           const timeUntil = meetingDateTime - now;
+           const minutesUntil = Math.floor(timeUntil / 60000);
+           const hoursUntil = Math.floor(minutesUntil / 60);
+           
+           setNextMeeting({
+             ...next,
+             meetingDateTime,
+             minutesUntil,
+             hoursUntil
+           });
+         } else {
+           setNextMeeting(null);
+         }
        } catch (error) {
-         console.error("Error fetching meetings:", error);
+         console.error("Error fetching next meeting:", error);
        }
      };
      
      loadMeetings();
+     loadNextMeeting();
    }, [user, isAuthenticated, isLoading])
   
   // Handle upload toggle for a specific meeting
   // Fetch meetingId from meetingName
   const getMeetingIdFromName = async (meetingName) => {
-    // Check cache first
     if (meetingIdCache.current[meetingName]) {
       return meetingIdCache.current[meetingName];
     }
     
     try {
-      const response = await fetch(
+      const response = await protectedGet(
         `${import.meta.env.VITE_BACKEND_URL}/getMeetingId/${encodeURIComponent(meetingName)}`
       );
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch meetingId for ${meetingName}`);
-      }
       
       const data = await response.json();
       const meetingId = data.meetingId;
       
-      // Cache the result
       meetingIdCache.current[meetingName] = meetingId;
-      
       return meetingId;
     } catch (error) {
       console.error(`Error fetching meetingId for ${meetingName}:`, error);
@@ -156,7 +195,7 @@ const Home = ({ setJoin }) => {
           }));
           
           // Upload segments (up to 3 in parallel)
-          await uploadOldestSegment(meetingId, emailId);
+          await uploadOldestSegment(meetingId, emailId, getAccessTokenSilently);
           
           // Check if done
           const afterCount = await db.chunks
@@ -246,25 +285,88 @@ const Home = ({ setJoin }) => {
   // Sample upcoming meetings data (unused, can be removed)
   // const upcomingMeetings = [...]
 
+  const formatTimeUntil = (minutesUntil, hoursUntil) => {
+    if (minutesUntil < 0) return "Starting now";
+    if (minutesUntil < 60) return `Starts in ${minutesUntil} minute${minutesUntil !== 1 ? 's' : ''}`;
+    if (hoursUntil < 24) return `Starts in ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''}`;
+    const days = Math.floor(hoursUntil / 24);
+    return `Starts in ${days} day${days !== 1 ? 's' : ''}`;
+  };
+
+  const formatMeetingTime = (dateTime) => {
+    return dateTime.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatMeetingDate = (dateTime) => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    if (dateTime.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (dateTime.toDateString() === tomorrow.toDateString()) {
+      return 'Tomorrow';
+    } else {
+      return dateTime.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+  };
+
   return (
     <div className='bg-black text-[#3F88C5] min-h-screen flex flex-col'>
       {/* Main Content */}
       <div className='flex-1 p-6'>
         {/* Upcoming Meeting Header */}
-        <header className='bg-[#FF7A30] p-5 rounded-xl mb-8 shadow-lg'>
-          <div className='flex items-center justify-between'>
-            <div>
-              <h2 className='text-2xl font-semibold text-white'>Next Meeting: Daily Standup</h2>
-              <div className='flex items-center mt-2 text-[#FFBA08]'>
-                <FaClock className='mr-2' />
-                <span>Starts in 15 minutes (12:30 PM)</span>
+        {nextMeeting ? (
+          <header className='bg-[#FF7A30] p-5 rounded-xl mb-8 shadow-lg'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <h2 className='text-2xl font-semibold text-white'>Next Meeting: {nextMeeting.meetingName}</h2>
+                <div className='flex items-center mt-2 text-[#FFBA08]'>
+                  <FaClock className='mr-2' />
+                  <span>
+                    {formatTimeUntil(nextMeeting.minutesUntil, nextMeeting.hoursUntil)} 
+                    {' '}({formatMeetingDate(nextMeeting.meetingDateTime)} at {formatMeetingTime(nextMeeting.meetingDateTime)})
+                  </span>
+                </div>
+                {nextMeeting.description && (
+                  <p className='text-white text-sm mt-2 opacity-90'>{nextMeeting.description}</p>
+                )}
               </div>
+              <button 
+                onClick={() => navigate('/scheduleMeeting')}
+                className='bg-[#FFBA08] hover:bg-[#D00000] text-[#032B43] font-medium py-2 px-4 rounded-lg transition-colors'
+              >
+                View Schedule
+              </button>
             </div>
-            <button className='bg-[#FFBA08] hover:bg-[#D00000] text-[#032B43] font-medium py-2 px-4 rounded-lg transition-colors'>
-              Join Now
-            </button>
-          </div>
-        </header>
+          </header>
+        ) : (
+          <header className='bg-slate-800 p-5 rounded-xl mb-8 shadow-lg border border-slate-600'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <h2 className='text-2xl font-semibold text-gray-400'>No Upcoming Meetings</h2>
+                <div className='flex items-center mt-2 text-gray-500'>
+                  <FaCalendarAlt className='mr-2' />
+                  <span>Schedule a meeting to see it here</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => navigate('/scheduleMeeting')}
+                className='bg-[#FFBA08] hover:bg-[#FF7A30] text-[#032B43] font-medium py-2 px-4 rounded-lg transition-colors'
+              >
+                Schedule Meeting
+              </button>
+            </div>
+          </header>
+        )}
 
         <div className='text-8xl mb-11'>Hello { userName }</div>
 

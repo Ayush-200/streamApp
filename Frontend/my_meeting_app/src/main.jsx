@@ -10,11 +10,12 @@ root.render(
     domain="dev-6u7dy62xhf1femi3.us.auth0.com"
     clientId="LiOcbGXMI0CAeGcaRQ3mYWweMjtyMu8F"
     authorizationParams={{
-      redirect_uri: window.location.origin + '/home'
+      redirect_uri: window.location.origin + '/home',
+      audience: 'https://dev-6u7dy62xhf1femi3.us.auth0.com/api/v2/',
+      scope: 'openid profile email'
     }}
-
-    cacheLocation="localstorage"   // 🔑 persist login after reload
-    useRefreshTokens={true}        // 🔑 ensures silent refresh works
+    cacheLocation="localstorage"
+    useRefreshTokens={true}
   > 
     <App />
    </Auth0Provider>
