@@ -101,8 +101,7 @@ export function handleUserLeft(meetingId, userId) {
   );
   
   if (!hasActiveParticipants) {
-    console.log(`🗑️ No active participants left, clearing meeting: ${meetingId}`);
-    meetingSessions.delete(meetingId);
+    console.log(`🗑️ No active participants left in memory for: ${meetingId}`);
   }
   
   return activeSession;
@@ -141,6 +140,7 @@ export async function saveMeetingSessionsToDB(meetingId) {
   );
 
   console.log(`✅ Sessions saved to DB: ${meetingId}`);
+  meetingSessions.delete(meetingId);
   return meeting.sessions;
 }
 
