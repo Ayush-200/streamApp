@@ -1,8 +1,9 @@
 import cloudinary from "../config/cloudinaryClient.js";
+import { recordChunkTiming } from "../services/sessionManager.js";
 
 export const uploadBlob = async (req, res) => {
     const { meetingId } = req.params;
-    const { userId, chunkIndex } = req.body;
+    const { userId, chunkIndex, chunkStartTime, chunkEndTime } = req.body;
     const blob = req.file;
 
     if (!blob) {
@@ -30,6 +31,10 @@ export const uploadBlob = async (req, res) => {
                 timeout: 600000 // 10 minutes timeout
             }
         );
+
+        if (chunkStartTime !== undefined && chunkEndTime !== undefined) {
+            recordChunkTiming(meetingId, userId, parseInt(chunkIndex), parseFloat(chunkStartTime), parseFloat(chunkEndTime));
+        }
 
         console.log(`✅ Segment ${chunkIndex} uploaded to Cloudinary`);
         res.json({ success: true, url: result.secure_url, chunkIndex });

@@ -30,6 +30,38 @@ function generateSessionId(userId, sessionCount) {
   return `${userId}_${sessionCount + 1}`;
 }
 
+export function recordChunkTiming(meetingId, userId, chunkIndex, chunkStartTime, chunkEndTime) {
+  const meeting = meetingSessions.get(meetingId);
+  if (!meeting) {
+    console.warn(`⚠️ No meeting found for chunk timing: ${meetingId}`);
+    return;
+  }
+
+  if (!meeting.sessions[userId]) {
+    meeting.sessions[userId] = [];
+  }
+
+  let session = meeting.sessions[userId].find(s => s.end === null);
+  if (!session) {
+    const sessionId = generateSessionId(userId, meeting.sessions[userId].length);
+    session = {
+      sessionId,
+      userId,
+      start: chunkStartTime,
+      end: null,
+      chunks: []
+    };
+    meeting.sessions[userId].push(session);
+  }
+
+  session.chunks = session.chunks || [];
+  session.chunks.push({ chunkIndex, start: chunkStartTime, end: chunkEndTime });
+
+  if (chunkStartTime < session.start) {
+    session.start = chunkStartTime;
+  }
+}
+
 export function handleUserJoined(meetingId, userId, socketId) {
   const meeting = initializeMeeting(meetingId);
   
@@ -127,6 +159,18 @@ export async function saveMeetingSessionsToDB(meetingId) {
     if (activeSession) {
       activeSession.end = getRelativeTimestamp(meetingId);
     }
+
+    meeting.sessions[userId].forEach(session => {
+      if (session.chunks && session.chunks.length > 0) {
+        const sortedChunks = [...session.chunks].sort((a, b) => a.start - b.start);
+        session.start = sortedChunks[0].start;
+        const lastChunk = sortedChunks[sortedChunks.length - 1];
+        if (session.end === null || lastChunk.end < session.end) {
+          session.end = lastChunk.end;
+        }
+      }
+      delete session.chunks;
+    });
   });
 
   await SessionDB.findOneAndUpdate(

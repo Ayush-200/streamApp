@@ -66,6 +66,10 @@ async function uploadSingleSegment(segment, meetingId, userEmail, getAccessToken
     formData.append("file", file);
     formData.append("userId", userEmail);
     formData.append("chunkIndex", segmentIndex);
+    if (segment.chunkStartTime !== undefined) {
+      formData.append("chunkStartTime", segment.chunkStartTime);
+      formData.append("chunkEndTime", segment.chunkEndTime);
+    }
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 600000);
