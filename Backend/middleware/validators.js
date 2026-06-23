@@ -132,6 +132,16 @@ export const validateScheduleMeeting = [
     handleValidationErrors
 ];
 
+export const validateUploadComplete = [
+    param('meetingId')
+        .trim()
+        .notEmpty().withMessage('Meeting ID is required'),
+    body('userId')
+        .trim()
+        .notEmpty().withMessage('User ID is required'),
+    handleValidationErrors
+];
+
 export const validateGetScheduledMeetings = [
     param('userId')
         .trim()

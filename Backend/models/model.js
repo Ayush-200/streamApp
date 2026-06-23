@@ -19,9 +19,10 @@ const meetingSchema = new mongoose.Schema({
 const ParticipantSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   joinTime: { type: Date, required: true },
-  leaveTime: { type: Date }, // can be null until they leave
-  videoPublicId: { type: String }, // filled after upload
-  lastSegmentIndex: { type: Number, default: -1 }, // Track last recorded segment index
+  leaveTime: { type: Date },
+  videoPublicId: { type: String },
+  lastSegmentIndex: { type: Number, default: -1 },
+  allChunksUploaded: { type: Boolean, default: false },
   chunks: [{
     chunkIndex: Number,
     cloudinaryUrl: String,

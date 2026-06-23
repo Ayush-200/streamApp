@@ -12,6 +12,7 @@ import { getMeetingId } from '../utils/getMeetingId.js';
 import { rootHandler } from '../controllers/rootController.js';
 import { generateToken } from '../controllers/tokenController.js';
 import { getLastSegmentIndex } from '../controllers/lastSegmentController.js';
+import { markUploadComplete } from '../controllers/uploadCompleteController.js';
 import { scheduleMeeting, getScheduledMeetings, deleteScheduledMeeting, updateScheduledMeetingStatus } from '../controllers/scheduleController.js';
 import {
     validateMeetingId,
@@ -22,6 +23,7 @@ import {
     validateAddUserMeeting,
     validateRemoveMeeting,
     validateGetLastSegment,
+    validateUploadComplete,
     validateScheduleMeeting,
     validateGetScheduledMeetings,
     validateDeleteScheduledMeeting
@@ -43,6 +45,7 @@ router.post('/removeMeetingFromSchedule/:emailId', authenticate, validateRemoveM
 router.get('/getMeetingId/:meetingName', authenticate, validateMeetingName, getMeetingId);
 router.get('/getLastSegmentIndex/:meetingName/:userId', authenticate, validateGetLastSegment, getLastSegmentIndex);
 router.post('/uploadSegment/:meetingId', authenticate, validateMeetingId, upload.single('file'), uploadBlob);
+router.post('/meeting/:meetingId/upload-complete', authenticate, validateUploadComplete, markUploadComplete);
 router.post('/scheduleMeeting/:userId', authenticate, validateScheduleMeeting, scheduleMeeting);
 router.get('/scheduledMeetings/:userId', authenticate, validateGetScheduledMeetings, getScheduledMeetings);
 router.delete('/scheduledMeeting/:meetingId', authenticate, validateDeleteScheduledMeeting, deleteScheduledMeeting);

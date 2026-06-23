@@ -60,30 +60,30 @@ const JoinMeetingForm = () => {
     };
     
   return (
-    <div className='flex flex-col items-center justify-center min-h-screen bg-black'>
-      <div className='bg-slate-800 p-8 rounded-xl shadow-lg w-96'>
-        <h2 className='text-2xl font-bold text-white mb-6'>Join Meeting</h2>
+    <div className='flex items-center justify-center min-h-screen bg-surface-dark p-4'>
+      <div className='glass rounded-2xl p-8 w-full max-w-md animate-fade-up'>
+        <h2 className='text-2xl font-heading font-bold text-text-primary mb-6'>Join Meeting</h2>
         
         <input 
           type="text" 
-          placeholder='Enter the meeting name' 
+          placeholder='Enter meeting name' 
           value={meetingName}
           onChange={(e) => {
             setMeetingName(e.target.value);
             setError("");
           }}
-          className='w-full p-3 mb-4 rounded-lg bg-slate-700 text-white border border-slate-600 focus:border-[#FFBA08] focus:outline-none'
+          className='input-field mb-4'
           disabled={loading}
         />
         
         {error && (
-          <p className='text-red-500 text-sm mb-4'>{error}</p>
+          <p className='text-brand-red text-sm mb-4'>{error}</p>
         )}
         
         <button 
           onClick={handleJoinMeeting}
           disabled={loading}
-          className='w-full bg-[#FFBA08] hover:bg-[#FF7A30] text-[#032B43] font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+          className='btn-primary w-full text-center disabled:opacity-50 disabled:cursor-not-allowed'
         >
           {loading ? 'Joining...' : 'Join Meeting'}
         </button>

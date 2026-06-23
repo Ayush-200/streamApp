@@ -134,61 +134,60 @@ const ScheduleMeeting = () => {
   };
 
   return (
-    <div className='bg-black text-white min-h-screen p-6'>
-      <div className='max-w-6xl mx-auto'>
-        <h1 className='text-4xl font-bold text-[#FFBA08] mb-8'>Schedule Meeting</h1>
+    <div className='bg-surface-dark text-text-primary min-h-screen p-4 md:p-6 lg:p-8'>
+      <div className='max-w-5xl mx-auto'>
+        <h1 className='text-3xl md:text-4xl font-heading font-bold text-gradient mb-8'>Schedule Meeting</h1>
         
-        {/* Schedule Form */}
-        <div className='bg-slate-800 rounded-xl p-6 mb-8 shadow-lg'>
-          <h2 className='text-2xl font-semibold text-[#3F88C5] mb-6'>Create New Schedule</h2>
+        <div className='glass rounded-2xl p-6 md:p-8 mb-8 animate-fade-up'>
+          <h2 className='text-xl md:text-2xl font-heading font-semibold text-text-primary mb-6'>Create New Schedule</h2>
           
-          <form onSubmit={handleSubmit} className='space-y-4'>
+          <form onSubmit={handleSubmit} className='space-y-5'>
             <div>
-              <label className='block text-sm font-medium text-gray-300 mb-2'>
-                Meeting Name *
+              <label className='block text-sm font-medium text-text-secondary mb-2'>
+                Meeting Name <span className='text-brand-red'>*</span>
               </label>
               <input 
                 type="text" 
                 value={meetingName}
                 onChange={(e) => setMeetingName(e.target.value)}
                 placeholder='Enter meeting name'
-                className='w-full p-3 rounded-lg bg-slate-700 text-white border border-slate-600 focus:border-[#FFBA08] focus:outline-none'
+                className='input-field'
                 disabled={loading}
               />
             </div>
             
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6'>
               <div>
-                <label className='block text-sm font-medium text-gray-300 mb-2'>
-                  Date *
+                <label className='block text-sm font-medium text-text-secondary mb-2'>
+                  Date <span className='text-brand-red'>*</span>
                 </label>
                 <input 
                   type="date" 
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
-                  className='w-full p-3 rounded-lg bg-slate-700 text-white border border-slate-600 focus:border-[#FFBA08] focus:outline-none'
+                  className='input-field'
                   disabled={loading}
                 />
               </div>
               
               <div>
-                <label className='block text-sm font-medium text-gray-300 mb-2'>
-                  Time *
+                <label className='block text-sm font-medium text-text-secondary mb-2'>
+                  Time <span className='text-brand-red'>*</span>
                 </label>
                 <input 
                   type="time" 
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
-                  className='w-full p-3 rounded-lg bg-slate-700 text-white border border-slate-600 focus:border-[#FFBA08] focus:outline-none'
+                  className='input-field'
                   disabled={loading}
                 />
               </div>
             </div>
             
             <div>
-              <label className='block text-sm font-medium text-gray-300 mb-2'>
-                Description (Optional)
+              <label className='block text-sm font-medium text-text-secondary mb-2'>
+                Description <span className='text-text-muted'>(Optional)</span>
               </label>
               <textarea 
                 value={description}
@@ -196,14 +195,14 @@ const ScheduleMeeting = () => {
                 placeholder='Add meeting description or notes'
                 rows={3}
                 maxLength={500}
-                className='w-full p-3 rounded-lg bg-slate-700 text-white border border-slate-600 focus:border-[#FFBA08] focus:outline-none resize-none'
+                className='input-field resize-none'
                 disabled={loading}
               />
-              <p className='text-xs text-gray-400 mt-1'>{description.length}/500 characters</p>
+              <p className='text-xs text-text-muted mt-1'>{description.length}/500 characters</p>
             </div>
             
             {error && (
-              <div className='bg-red-500 bg-opacity-20 border border-red-500 text-red-300 p-3 rounded-lg'>
+              <div className='bg-brand-red/10 border border-brand-red/30 text-brand-red p-3.5 rounded-xl text-sm'>
                 {error}
               </div>
             )}
@@ -211,77 +210,76 @@ const ScheduleMeeting = () => {
             <button 
               type="submit"
               disabled={loading}
-              className='w-full bg-[#FFBA08] hover:bg-[#FF7A30] text-[#032B43] font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              className='btn-primary w-full text-center disabled:opacity-50 disabled:cursor-not-allowed text-base'
             >
               {loading ? 'Scheduling...' : 'Schedule Meeting'}
             </button>
           </form>
         </div>
 
-        {/* Scheduled Meetings List */}
-        <div className='bg-slate-800 rounded-xl p-6 shadow-lg'>
-          <h2 className='text-2xl font-semibold text-[#3F88C5] mb-6 flex items-center'>
-            <FaCalendarAlt className='mr-3 text-[#FFBA08]' />
+        <div className='glass rounded-2xl p-6 md:p-8 animate-fade-up'>
+          <h2 className='text-xl md:text-2xl font-heading font-semibold text-text-primary mb-6 flex items-center'>
+            <FaCalendarAlt className='mr-3 text-brand-amber' />
             Your Scheduled Meetings
           </h2>
           
           {scheduledMeetings.length > 0 ? (
-            <div className='space-y-4'>
+            <div className='space-y-3'>
               {scheduledMeetings.map((meeting) => (
                 <div 
                   key={meeting._id}
-                  className='bg-slate-700 rounded-lg p-5 border border-slate-600 hover:border-[#3F88C5] transition-all'
+                  className='bg-surface-card rounded-xl p-5 border border-border-muted hover:border-brand-blue/40 transition-all duration-300 hover:bg-surface-hover'
                 >
-                  <div className='flex items-start justify-between'>
-                    <div className='flex-1'>
-                      <div className='flex items-center gap-3 mb-2'>
-                        <h3 className='text-xl font-semibold text-white'>{meeting.meetingName}</h3>
-                        <span className={`text-xs px-3 py-1 rounded-full text-white ${getStatusColor(meeting.status)}`}>
-                          {meeting.status.toUpperCase()}
+                  <div className='flex items-start justify-between gap-4'>
+                    <div className='flex-1 min-w-0'>
+                      <div className='flex items-center gap-3 mb-2 flex-wrap'>
+                        <h3 className='text-lg font-heading font-semibold text-text-primary truncate'>{meeting.meetingName}</h3>
+                        <span className={`text-xs px-2.5 py-0.5 rounded-full text-white font-medium ${getStatusColor(meeting.status)}`}>
+                          {meeting.status}
                         </span>
                       </div>
                       
-                      <div className='flex items-center gap-4 text-sm text-gray-300 mb-2'>
-                        <div className='flex items-center gap-2'>
-                          <FaCalendarAlt className='text-[#FFBA08]' />
+                      <div className='flex items-center gap-4 text-sm text-text-secondary flex-wrap'>
+                        <div className='flex items-center gap-1.5'>
+                          <FaCalendarAlt className='text-brand-amber text-xs' />
                           <span>{formatDate(meeting.scheduledDate)}</span>
                         </div>
-                        <div className='flex items-center gap-2'>
-                          <FaClock className='text-[#FFBA08]' />
+                        <div className='flex items-center gap-1.5'>
+                          <FaClock className='text-brand-amber text-xs' />
                           <span>{meeting.scheduledTime}</span>
                         </div>
                       </div>
                       
                       {meeting.description && (
-                        <p className='text-sm text-gray-400 mt-2'>{meeting.description}</p>
+                        <p className='text-sm text-text-muted mt-2 line-clamp-2'>{meeting.description}</p>
                       )}
                     </div>
                     
-                    <div className='flex items-center gap-2 ml-4'>
+                    <div className='flex items-center gap-2 shrink-0'>
                       {meeting.status === 'scheduled' && (
                         <>
                           <button
                             onClick={() => handleStatusChange(meeting._id, 'completed')}
-                            className='p-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors'
+                            className='p-2.5 bg-brand-green/20 hover:bg-brand-green text-brand-green hover:text-white rounded-xl transition-all duration-300'
                             title='Mark as completed'
                           >
-                            <FaCheck />
+                            <FaCheck className='text-xs' />
                           </button>
                           <button
                             onClick={() => handleStatusChange(meeting._id, 'cancelled')}
-                            className='p-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors'
+                            className='p-2.5 bg-brand-orange/20 hover:bg-brand-orange text-brand-orange hover:text-white rounded-xl transition-all duration-300'
                             title='Cancel meeting'
                           >
-                            <FaTimes />
+                            <FaTimes className='text-xs' />
                           </button>
                         </>
                       )}
                       <button
                         onClick={() => handleDelete(meeting._id)}
-                        className='p-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors'
+                        className='p-2.5 bg-brand-red/20 hover:bg-brand-red text-brand-red hover:text-white rounded-xl transition-all duration-300'
                         title='Delete meeting'
                       >
-                        <FaTrash />
+                        <FaTrash className='text-xs' />
                       </button>
                     </div>
                   </div>
@@ -289,10 +287,10 @@ const ScheduleMeeting = () => {
               ))}
             </div>
           ) : (
-            <div className='text-center py-12'>
-              <FaCalendarAlt className='text-6xl text-gray-600 mx-auto mb-4' />
-              <p className='text-gray-400 text-lg'>No scheduled meetings</p>
-              <p className='text-gray-500 text-sm mt-2'>Schedule your first meeting using the form above</p>
+            <div className='text-center py-16'>
+              <FaCalendarAlt className='text-5xl text-border-default mx-auto mb-4' />
+              <p className='text-text-secondary text-lg'>No scheduled meetings</p>
+              <p className='text-text-muted text-sm mt-2'>Schedule your first meeting using the form above</p>
             </div>
           )}
         </div>

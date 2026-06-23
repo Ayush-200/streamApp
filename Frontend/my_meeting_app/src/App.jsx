@@ -25,7 +25,14 @@ function App() {
           <Route path = '/createMeetingForm' element = {<CreateMeetingForm/>} />
           <Route path = '/ScheduleMeeting' element = {<ScheduleMeeting user = {user}/>} />
           <Route path = '/joinMeetingForm' element = {<JoinMeetingForm />} />
-        <Route path = '*' element = {<div>404 Not Found this is handled by *</div>} />
+        <Route path = '*' element = {
+          <div className='flex items-center justify-center min-h-screen bg-surface-dark'>
+            <div className='text-center'>
+              <h1 className='text-6xl font-heading font-bold text-gradient mb-4'>404</h1>
+              <p className='text-text-secondary'>Page not found</p>
+            </div>
+          </div>
+        } />
         {/* <Route path = '/viewRecordings' element = {<ViewRecording />} /> */}
       </Routes>
     </Router>

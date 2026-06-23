@@ -220,6 +220,28 @@ const Home = ({ setJoin }) => {
             }));
             
             console.log(`✅ Upload complete: ${meetingName} (${initialCount} segments)`);
+
+            // Notify backend that all chunks are uploaded
+            try {
+              const token = await getAccessTokenSilently({
+                authorizationParams: {
+                  audience: `https://${import.meta.env.VITE_AUTH0_DOMAIN || 'dev-6u7dy62xhf1femi3.us.auth0.com'}/api/v2/`,
+                }
+              });
+              await fetch(
+                `${import.meta.env.VITE_BACKEND_URL}/meeting/${meetingId}/upload-complete`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ userId: emailId })
+                }
+              );
+            } catch (notifyError) {
+              console.error("Failed to notify upload complete:", notifyError);
+            }
             
             // Clear progress after 3 seconds
             setTimeout(() => {
@@ -320,47 +342,52 @@ const Home = ({ setJoin }) => {
   };
 
   return (
-    <div className='bg-black text-[#3F88C5] min-h-screen flex flex-col'>
-      {/* Main Content */}
-      <div className='flex-1 p-6'>
+    <div className='bg-surface-dark text-text-secondary min-h-screen flex flex-col'>
+      <div className='flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full'>
         {/* Upcoming Meeting Header */}
         {nextMeeting ? (
-          <header className='bg-[#FF7A30] p-5 rounded-xl mb-8 shadow-lg'>
-            <div className='flex items-center justify-between'>
+          <header className='relative overflow-hidden bg-gradient-to-r from-brand-orange to-brand-amber p-6 rounded-2xl mb-8 shadow-lg shadow-brand-orange/10 animate-fade-in'>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent_60%)]"></div>
+            <div className='relative flex items-center justify-between flex-wrap gap-4'>
               <div>
-                <h2 className='text-2xl font-semibold text-white'>Next Meeting: {nextMeeting.meetingName}</h2>
-                <div className='flex items-center mt-2 text-[#FFBA08]'>
-                  <FaClock className='mr-2' />
+                <div className='flex items-center gap-2 text-white/80 text-sm font-medium mb-1'>
+                  <FaClock className="text-white" />
+                  <span>Upcoming</span>
+                </div>
+                <h2 className='text-xl md:text-2xl font-heading font-bold text-white'>{nextMeeting.meetingName}</h2>
+                <div className='flex items-center mt-1.5 text-white/80 text-sm'>
+                  <FaCalendarAlt className='mr-2 text-white' />
                   <span>
-                    {formatTimeUntil(nextMeeting.minutesUntil, nextMeeting.hoursUntil)} 
-                    {' '}({formatMeetingDate(nextMeeting.meetingDateTime)} at {formatMeetingTime(nextMeeting.meetingDateTime)})
+                    {formatMeetingDate(nextMeeting.meetingDateTime)} at {formatMeetingTime(nextMeeting.meetingDateTime)}
                   </span>
+                  <span className="mx-2 text-white/40">·</span>
+                  <span className="text-white/90 font-medium">{formatTimeUntil(nextMeeting.minutesUntil, nextMeeting.hoursUntil)}</span>
                 </div>
                 {nextMeeting.description && (
-                  <p className='text-white text-sm mt-2 opacity-90'>{nextMeeting.description}</p>
+                  <p className='text-white/70 text-sm mt-2 max-w-xl'>{nextMeeting.description}</p>
                 )}
               </div>
               <button 
                 onClick={() => navigate('/scheduleMeeting')}
-                className='bg-[#FFBA08] hover:bg-[#D00000] text-[#032B43] font-medium py-2 px-4 rounded-lg transition-colors'
+                className='bg-white/20 hover:bg-white/30 text-white font-medium py-2.5 px-5 rounded-xl transition-all duration-300 backdrop-blur-sm text-sm'
               >
                 View Schedule
               </button>
             </div>
           </header>
         ) : (
-          <header className='bg-slate-800 p-5 rounded-xl mb-8 shadow-lg border border-slate-600'>
-            <div className='flex items-center justify-between'>
+          <header className='glass rounded-2xl p-6 mb-8 animate-fade-in'>
+            <div className='flex items-center justify-between flex-wrap gap-4'>
               <div>
-                <h2 className='text-2xl font-semibold text-gray-400'>No Upcoming Meetings</h2>
-                <div className='flex items-center mt-2 text-gray-500'>
+                <h2 className='text-xl md:text-2xl font-heading font-bold text-text-primary'>No Upcoming Meetings</h2>
+                <div className='flex items-center mt-1.5 text-text-muted text-sm'>
                   <FaCalendarAlt className='mr-2' />
                   <span>Schedule a meeting to see it here</span>
                 </div>
               </div>
               <button 
                 onClick={() => navigate('/scheduleMeeting')}
-                className='bg-[#FFBA08] hover:bg-[#FF7A30] text-[#032B43] font-medium py-2 px-4 rounded-lg transition-colors'
+                className='btn-primary text-sm'
               >
                 Schedule Meeting
               </button>
@@ -368,53 +395,58 @@ const Home = ({ setJoin }) => {
           </header>
         )}
 
-        <div className='text-8xl mb-11'>Hello { userName }</div>
+        <div className='mb-10 animate-fade-up'>
+          <span className='text-5xl md:text-6xl lg:text-7xl font-heading font-bold text-text-primary'>
+            Hello{' '}
+          </span>
+          <span className='text-5xl md:text-6xl lg:text-7xl font-heading font-bold text-gradient'>
+            {userName.split(' ')[0]}
+          </span>
+        </div>
 
         {/* Meeting Options Grid */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10'>
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-10 animate-fade-up'>
           {/* Create New Meeting */}
           <button
             onClick={() => navigate('/createMeetingForm')}
-            className='bg-slate-600 border border-slate-300 rounded-xl p-6 flex flex-col items-start gap-4 text-left transition-all duration-300 hover:bg-[#3F88C5] hover:scale-[1.02] group'
+            className='glass glass-hover rounded-2xl p-6 flex flex-col items-start gap-4 text-left group border border-border-default/40'
           >
-            <div className='p-3 rounded-lg bg-[#33415c] group-hover:bg-[#FFBA08] group-hover:text-[#032B43]'>
+            <div className='p-3.5 rounded-xl bg-brand-amber/10 text-brand-amber group-hover:bg-brand-amber group-hover:text-brand-navy transition-all duration-300'>
               <FaPlus className='text-2xl' />
             </div>
-            <h3 className='text-xl font-bold text-white'>New Meeting</h3>
-            <p className='text-sm text-[#FFBA08]'>Setup a new recording</p>
+            <h3 className='text-xl font-heading font-bold text-text-primary'>New Meeting</h3>
+            <p className='text-sm text-text-muted'>Setup a new recording session</p>
           </button>
 
           {/* Join Call */}
           <button
             onClick={() => { setJoin(true); navigate(`/joinMeetingForm`) }}
-            className='bg-slate-600 border border-[#3F88C5] rounded-xl p-6 flex flex-col items-start gap-4 text-left transition-all duration-300 hover:bg-[#3F88C5] hover:scale-[1.02] group'
+            className='glass glass-hover rounded-2xl p-6 flex flex-col items-start gap-4 text-left group border border-border-default/40'
           >
-            <div className='p-3 rounded-lg bg-[#33415c] group-hover:bg-[#FFBA08] group-hover:text-[#032B43]'>
+            <div className='p-3.5 rounded-xl bg-brand-blue/10 text-brand-blue group-hover:bg-brand-amber group-hover:text-brand-navy transition-all duration-300'>
               <FaPhone className='text-2xl' />
             </div>
-            <h3 className='text-xl font-bold text-white'>Join Call</h3>
-            <p className='text-sm text-[#FFBA08]'>via invitation link</p>
+            <h3 className='text-xl font-heading font-bold text-text-primary'>Join Call</h3>
+            <p className='text-sm text-text-muted'>Via invitation link</p>
           </button>
 
           {/* Schedule Meeting */}
           <button
             onClick={() => navigate('/scheduleMeeting')}
-            className='bg-slate-600 border border-[#3F88C5] rounded-xl p-6 flex flex-col items-start gap-4 text-left transition-all duration-300 hover:bg-[#3F88C5] hover:scale-[1.02] group'
+            className='glass glass-hover rounded-2xl p-6 flex flex-col items-start gap-4 text-left group border border-border-default/40'
           >
-            <div className='p-3 rounded-lg bg-[#33415c] group-hover:bg-[#FFBA08] group-hover:text-[#032B43]'>
+            <div className='p-3.5 rounded-xl bg-brand-amber/10 text-brand-amber group-hover:bg-brand-amber group-hover:text-brand-navy transition-all duration-300'>
               <FaCalendarAlt className='text-2xl' />
             </div>
-            <h3 className='text-xl font-bold text-white'>Schedule Meeting</h3>
-            <p className='text-sm text-[#FFBA08]'>Plan your meeting</p>
+            <h3 className='text-xl font-heading font-bold text-text-primary'>Schedule Meeting</h3>
+            <p className='text-sm text-text-muted'>Plan ahead</p>
           </button>
-
-          
         </div>
 
-        {/* Upcoming Meetings Section */}
-        <div className='bg-slate-800 rounded-xl p-6 shadow-lg'>
-          <h3 className='text-2xl font-bold text-white mb-4 flex items-center'>
-            <FaCalendarAlt className='mr-3 text-[#FFBA08]' />
+        {/* Your Meetings Section */}
+        <div className='glass rounded-2xl p-6 animate-fade-up'>
+          <h3 className='text-xl md:text-2xl font-heading font-bold text-text-primary mb-5 flex items-center'>
+            <FaCalendarAlt className='mr-3 text-brand-amber' />
             Your Meetings
           </h3>
           
@@ -428,35 +460,35 @@ const Home = ({ setJoin }) => {
                   <div
                     key={i}
                     onClick={() => navigate(`/meeting/${m.meeting}`)}
-                    className={`cursor-pointer p-4 bg-slate-700 rounded-lg border transition-all duration-300 group relative ${
+                    className={`cursor-pointer p-4 rounded-xl border transition-all duration-300 group relative ${
                       isThisMeetingUploading 
-                        ? 'border-[#FFBA08] ring-2 ring-[#FFBA08] ring-opacity-50' 
+                        ? 'bg-surface-elevated border-brand-amber shadow-lg shadow-brand-amber/10 animate-pulse-glow' 
                         : isAnotherMeetingUploading
-                        ? 'border-slate-600 opacity-60'
-                        : 'border-slate-600 hover:border-[#FFBA08] hover:bg-slate-600'
+                        ? 'bg-surface-card border-border-muted opacity-50'
+                        : 'bg-surface-card border-border-muted hover:border-brand-amber hover:bg-surface-hover hover:translate-y-[-2px] hover:shadow-lg hover:shadow-brand-amber/5 hover:ring-1 hover:ring-brand-amber/30'
                     }`}
                   >
-                    <div className='flex items-start justify-between mb-2'>
-                      <MdFiberManualRecord className={`mt-1 ${
+                    <div className='flex items-start justify-between mb-3'>
+                      <MdFiberManualRecord className={`mt-0.5 ${
                         isThisMeetingUploading 
-                          ? 'text-[#FFBA08] animate-pulse' 
-                          : 'text-[#3F88C5] group-hover:text-[#FFBA08]'
+                          ? 'text-brand-amber animate-pulse' 
+                          : 'text-brand-blue group-hover:text-brand-amber'
                       }`} />
-                      <span className='text-xs text-gray-400'>
+                      <span className='text-xs text-text-muted'>
                         {new Date(m.date).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
                         })}
                       </span>
                     </div>
-                    <p className={`font-semibold mb-1 ${
+                    <p className={`font-heading font-semibold mb-1 ${
                       isThisMeetingUploading 
-                        ? 'text-[#FFBA08]' 
-                        : 'text-white group-hover:text-[#FFBA08]'
+                        ? 'text-brand-amber' 
+                        : 'text-text-primary group-hover:text-brand-amber'
                     }`}>
                       {m.meeting}
                     </p>
-                    <p className="text-sm text-gray-400 mb-3">
+                    <p className="text-xs text-text-muted">
                       {new Date(m.date).toLocaleDateString("en-US", {
                         weekday: "short",
                         year: "numeric",
@@ -465,82 +497,80 @@ const Home = ({ setJoin }) => {
                       })}
                     </p>
                     
-                    {/* Upload status indicator */}
                     {isThisMeetingUploading && (
-                      <div className="absolute top-3 left-3 bg-[#FFBA08] text-[#032B43] text-xs font-bold px-2 py-1 rounded">
+                      <div className="absolute top-3 left-3 bg-brand-amber text-brand-navy text-xs font-bold px-2 py-1 rounded-lg">
                         UPLOADING
                       </div>
                     )}
                     
                     {/* Upload Progress Bar */}
                     {uploadProgress[m.meeting] && (
-                      <div className="mt-3 mb-2">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs text-gray-300 font-medium">
-                            {uploadProgress[m.meeting].status === 'uploading' && '⏳ Uploading...'}
-                            {uploadProgress[m.meeting].status === 'completed' && '✅ Complete!'}
-                            {uploadProgress[m.meeting].status === 'paused' && '⏸️ Paused'}
-                            {uploadProgress[m.meeting].status === 'error' && '❌ Error'}
+                      <div className="mt-4 mb-2">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <span className="text-xs text-text-secondary font-medium">
+                            {uploadProgress[m.meeting].status === 'uploading' && 'Uploading...'}
+                            {uploadProgress[m.meeting].status === 'completed' && 'Complete'}
+                            {uploadProgress[m.meeting].status === 'paused' && 'Paused'}
+                            {uploadProgress[m.meeting].status === 'error' && 'Error'}
                           </span>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-text-muted">
                             {uploadProgress[m.meeting].uploaded}/{uploadProgress[m.meeting].total}
                           </span>
                         </div>
-                        <div className="w-full bg-gray-600 rounded-full h-2 overflow-hidden">
+                        <div className="w-full bg-border-muted rounded-full h-1.5 overflow-hidden">
                           <div 
-                            className={`h-2 rounded-full transition-all duration-300 ${
+                            className={`h-1.5 rounded-full transition-all duration-500 ${
                               uploadProgress[m.meeting].status === 'completed' 
-                                ? 'bg-green-500' 
+                                ? 'bg-brand-green' 
                                 : uploadProgress[m.meeting].status === 'error'
-                                ? 'bg-red-500'
+                                ? 'bg-brand-red'
                                 : uploadProgress[m.meeting].status === 'paused'
-                                ? 'bg-gray-400'
-                                : 'bg-[#FFBA08]'
+                                ? 'bg-text-muted'
+                                : 'bg-brand-amber'
                             }`}
                             style={{ width: `${uploadProgress[m.meeting].percentage}%` }}
                           />
                         </div>
                         <div className="flex justify-between items-center mt-1">
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-text-muted">
                             {uploadProgress[m.meeting].percentage}%
                           </span>
                           {uploadProgress[m.meeting].remaining > 0 && (
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs text-text-muted">
                               {uploadProgress[m.meeting].remaining} remaining
                             </span>
                           )}
                         </div>
                         {uploadProgress[m.meeting].error && (
-                          <p className="text-xs text-red-400 mt-1">
+                          <p className="text-xs text-brand-red mt-1">
                             {uploadProgress[m.meeting].error}
                           </p>
                         )}
                       </div>
                     )}
                     
-                    {/* Upload Segment Button */}
                     <button
                       onClick={(e) => handleUploadToggle(m.meeting, e)}
                       disabled={isAnotherMeetingUploading}
-                      className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-300 ${
+                      className={`absolute bottom-3 right-3 p-2.5 rounded-xl transition-all duration-300 ${
                         isThisMeetingUploading
-                          ? 'bg-[#D00000] hover:bg-red-700'
+                          ? 'bg-brand-red hover:bg-red-700 text-white'
                           : isAnotherMeetingUploading
-                          ? 'bg-gray-600 cursor-not-allowed opacity-50'
-                          : 'bg-[#FFBA08] hover:bg-[#FF7A30]'
+                          ? 'bg-surface-elevated cursor-not-allowed opacity-50 text-text-muted'
+                          : 'bg-brand-amber hover:bg-brand-orange text-brand-navy'
                       }`}
                       title={
                         isAnotherMeetingUploading 
-                          ? `Another meeting is uploading. Click to switch to ${m.meeting}` 
+                          ? `Switch upload to ${m.meeting}` 
                           : isThisMeetingUploading 
                           ? 'Pause Upload' 
                           : 'Upload Segments'
                       }
                     >
                       {isThisMeetingUploading ? (
-                        <FaPause className='text-white text-sm' />
+                        <FaPause className='text-sm' />
                       ) : (
-                        <FaPlay className='text-[#032B43] text-sm' />
+                        <FaPlay className='text-sm' />
                       )}
                     </button>
                   </div>
@@ -548,25 +578,25 @@ const Home = ({ setJoin }) => {
               })}
             </div>
           ) : (
-            <div className='text-center py-8'>
-              <p className="text-gray-400 text-lg">No upcoming meetings</p>
-              <p className="text-gray-500 text-sm mt-2">Create or schedule a meeting to get started</p>
+            <div className='text-center py-12'>
+              <FaCalendarAlt className='text-5xl text-text-muted mx-auto mb-4' />
+              <p className="text-text-secondary text-lg">No meetings yet</p>
+              <p className="text-text-muted text-sm mt-2">Create or schedule a meeting to get started</p>
             </div>
           )}
         </div>
-
       </div>
 
       {/* User Footer */}
-      <footer className='bg-[#032B43] p-4 border-t border-[#3F88C5]'>
-        <div className='flex items-center justify-between'>
-          <div className='flex items-center'>
+      <footer className='glass border-t border-border-default/50'>
+        <div className='max-w-7xl mx-auto p-4 flex items-center justify-between'>
+          <div className='flex items-center gap-3'>
             {user?.picture && (
-              <img src={user.picture} alt={user?.name} className='w-8 h-8 rounded-full mr-3' />
+              <img src={user.picture} alt={user?.name} className='w-8 h-8 rounded-full ring-2 ring-border-default' />
             )}
-            <span className='text-[#3F88C5]'>{user?.name || 'User'}</span>
+            <span className='text-text-secondary text-sm'>{user?.name || 'User'}</span>
           </div>
-          <span className='text-sm text-[#3F88C5]'>Meeting Assistant v1.0</span>
+          <span className='text-xs text-text-muted'>StreamApp v1.0</span>
         </div>
       </footer>
     </div>

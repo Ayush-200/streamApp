@@ -239,61 +239,100 @@
 
     
 
-    if (!client || !call) return <div>Loading...</div>;
+    if (!client || !call) return (
+      <div className="flex items-center justify-center h-screen bg-surface-dark">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-brand-amber border-t-transparent"></div>
+          <p className="text-text-secondary text-sm">Connecting to meeting...</p>
+        </div>
+      </div>
+    );
 
     return (
       <StreamVideo client={client}>
         <StreamCall call={call}>
           <StreamTheme>
-            <div className="flex flex-row w-full overflow-hidden ">
+            <div className="relative h-screen bg-surface-dark overflow-hidden">
               {/* Main video area */}
-              <div
-                className={`flex flex-col h-full ${
-                  showParticipantList ? "w-[100vw]" : "w-[100vw]"
-                }`}
-              >
-                <div className="flex-grow h-[90vh] text-neutral-200 bg-gray-900 flex justify-center items-center">
-                  {/* Show video tiles */}
+              <div className={`h-full ${showParticipantList ? "mr-[20vw]" : ""} transition-all duration-500 ease-in-out`}>
+                <div className="h-full flex items-center justify-center">
                   <SpeakerLayout />
-                </div>
-
-                {/* Controls Section */}
-                <div className="absolute h-[10vh] bottom-0 w-[100%] bg-black flex justify-center items-center gap-4 text-white">
-                  <CallControls />
-                  <button className="bg-amber-400 p-2 rounded-full" onClick={() => handleRecord()}>
-                    record
-                  </button>
-                  <button className="bg-red-600 hover:bg-red-700 p-3 px-6 rounded-lg text-white font-semibold" onClick={handleHangup}>
-                    Leave Call
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    className="absolute right-0 bg-slate-800 p-3 rounded-full"
-                  >
-                    <i className="fa-solid fa-users"></i>
-                  </button>
                 </div>
               </div>
 
-              {/* Sidebar for participants */}
+              {/* Controls Bar */}
+              <div className="absolute bottom-0 left-0 right-0 h-[72px] bg-surface-dark/90 backdrop-blur-xl border-t border-border-default/30 flex items-center justify-center gap-3 px-4 z-30">
+                <CallControls />
+                <button
+                  className={`p-2.5 rounded-xl transition-all duration-300 ${
+                    recording
+                      ? 'bg-brand-red text-white animate-pulse'
+                      : 'bg-surface-elevated hover:bg-surface-hover text-text-primary'
+                  }`}
+                  onClick={() => handleRecord()}
+                  title={recording ? 'Stop Recording' : 'Start Recording'}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="6"/>
+                  </svg>
+                </button>
+                <button
+                  className="bg-brand-red hover:bg-red-700 px-5 py-2.5 rounded-xl text-white font-semibold text-sm transition-all duration-300 hover:shadow-lg hover:shadow-brand-red/20"
+                  onClick={handleHangup}
+                >
+                  Leave Call
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  className={`p-2.5 rounded-xl transition-all duration-300 ${
+                    showParticipantList
+                      ? 'bg-brand-amber text-brand-navy'
+                      : 'bg-surface-elevated hover:bg-surface-hover text-text-secondary'
+                  }`}
+                  title="Toggle participants"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Participants Sidebar */}
               <div
-                className={`absolute right-0 bg-blue-600 h-[90vh] py-5 overflow-hidden overflow-x-hidden transition-all duration-500 ease-in-out ${
+                className={`fixed right-0 top-0 h-full bg-surface-card/95 backdrop-blur-xl border-l border-border-default/30 transition-all duration-500 ease-in-out z-20 ${
                   showParticipantList
-                    ? "w-[20vw] translate-x-0"
+                    ? "w-[20vw] min-w-[280px] translate-x-0"
                     : "w-0 translate-x-full"
                 }`}
               >
-                {showParticipantList && <CallParticipantsList />}
+                {showParticipantList && (
+                  <div className="h-full p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-heading font-semibold text-text-primary text-sm">Participants</h3>
+                      <button
+                        onClick={handleSubmit}
+                        className="text-text-muted hover:text-text-primary transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <CallParticipantsList />
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Loading Overlay */}
             {isLeaving && (
-              <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
-                <div className="bg-slate-800 p-8 rounded-xl shadow-2xl flex flex-col items-center gap-4">
-                  <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#FFBA08]"></div>
-                  <p className="text-white text-xl font-semibold">Saving recording...</p>
-                  <p className="text-gray-400 text-sm">Please wait while we save your data</p>
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="glass rounded-2xl p-8 flex flex-col items-center gap-4 animate-scale-in">
+                  <div className="animate-spin rounded-full h-12 w-12 border-2 border-brand-amber border-t-transparent"></div>
+                  <p className="text-text-primary text-lg font-heading font-semibold">Saving recording...</p>
+                  <p className="text-text-muted text-sm">Please wait while we save your data</p>
                 </div>
               </div>
             )}

@@ -8,9 +8,9 @@ import {
 import { CustomEndCallButton } from './CustomEndCallButton';
 const CustomControls = () => {
   return (
-     <div className="flex gap-4 justify-center">
-      <ToggleAudioPublishingButton className="bg-slate-900  hover:bg-black text-white rounded-full p-3 shadow-md" />
-      <ToggleVideoPublishingButton className="bg-slate-900 hover:bg-black text-white rounded-full p-3 shadow-md" />
+     <div className="flex gap-3 justify-center">
+      <ToggleAudioPublishingButton className="bg-surface-elevated hover:bg-surface-hover text-text-primary rounded-xl p-3 transition-all duration-300" />
+      <ToggleVideoPublishingButton className="bg-surface-elevated hover:bg-surface-hover text-text-primary rounded-xl p-3 transition-all duration-300" />
       <CustomEndCallButton />
 
     </div>
