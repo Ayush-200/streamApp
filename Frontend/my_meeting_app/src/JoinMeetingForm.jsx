@@ -61,8 +61,8 @@ const JoinMeetingForm = () => {
     
   return (
     <div className='flex items-center justify-center min-h-screen bg-surface-dark p-4'>
-      <div className='glass rounded-2xl p-8 w-full max-w-md animate-fade-up'>
-        <h2 className='text-2xl font-heading font-bold text-text-primary mb-6'>Join Meeting</h2>
+      <div className='bg-white/8 backdrop-blur-xl border-2 border-brand-amber/30 shadow-[0_8px_32px_rgba(255,186,8,0.08)] rounded-2xl p-8 w-full max-w-md animate-fade-up'>
+        <h2 className='text-2xl font-heading font-bold text-white mb-6'>Join Meeting</h2>
         
         <input 
           type="text" 
@@ -72,7 +72,7 @@ const JoinMeetingForm = () => {
             setMeetingName(e.target.value);
             setError("");
           }}
-          className='input-field mb-4'
+          className='w-full px-4 py-3 rounded-xl bg-surface-elevated text-white border-2 border-brand-amber/30 outline-none transition-all duration-300 placeholder:text-[#cbd5e1] focus:border-brand-amber focus:shadow-[0_0_0_3px_rgba(255,186,8,0.15)] mb-4'
           disabled={loading}
         />
         
@@ -83,7 +83,7 @@ const JoinMeetingForm = () => {
         <button 
           onClick={handleJoinMeeting}
           disabled={loading}
-          className='btn-primary w-full text-center disabled:opacity-50 disabled:cursor-not-allowed'
+          className='bg-brand-amber hover:bg-brand-orange text-brand-navy font-semibold px-6 py-3 rounded-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(255,186,8,0.3)] active:translate-y-0 w-full text-center disabled:opacity-50 disabled:cursor-not-allowed'
         >
           {loading ? 'Joining...' : 'Join Meeting'}
         </button>

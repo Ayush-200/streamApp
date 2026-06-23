@@ -136,10 +136,10 @@ const ScheduleMeeting = () => {
   return (
     <div className='bg-surface-dark text-text-primary min-h-screen p-4 md:p-6 lg:p-8'>
       <div className='max-w-5xl mx-auto'>
-        <h1 className='text-3xl md:text-4xl font-heading font-bold text-gradient mb-8'>Schedule Meeting</h1>
+        <h1 className='text-3xl md:text-4xl font-heading font-bold bg-gradient-to-r from-brand-amber to-brand-orange bg-clip-text text-transparent mb-8'>Schedule Meeting</h1>
         
-        <div className='glass rounded-2xl p-6 md:p-8 mb-8 animate-fade-up'>
-          <h2 className='text-xl md:text-2xl font-heading font-semibold text-text-primary mb-6'>Create New Schedule</h2>
+        <div className='bg-white/8 backdrop-blur-xl border-2 border-brand-amber/30 shadow-[0_8px_32px_rgba(255,186,8,0.08)] rounded-2xl p-6 md:p-8 mb-8 animate-fade-up'>
+          <h2 className='text-xl md:text-2xl font-heading font-semibold text-white mb-6'>Create New Schedule</h2>
           
           <form onSubmit={handleSubmit} className='space-y-5'>
             <div>
@@ -151,7 +151,7 @@ const ScheduleMeeting = () => {
                 value={meetingName}
                 onChange={(e) => setMeetingName(e.target.value)}
                 placeholder='Enter meeting name'
-                className='input-field'
+                className='w-full px-4 py-3 rounded-xl bg-surface-elevated text-white border-2 border-brand-amber/30 outline-none transition-all duration-300 placeholder:text-[#cbd5e1] focus:border-brand-amber focus:shadow-[0_0_0_3px_rgba(255,186,8,0.15)]'
                 disabled={loading}
               />
             </div>
@@ -166,7 +166,7 @@ const ScheduleMeeting = () => {
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
-                  className='input-field'
+                  className='w-full px-4 py-3 rounded-xl bg-surface-elevated text-white border-2 border-brand-amber/30 outline-none transition-all duration-300 placeholder:text-[#cbd5e1] focus:border-brand-amber focus:shadow-[0_0_0_3px_rgba(255,186,8,0.15)]'
                   disabled={loading}
                 />
               </div>
@@ -179,7 +179,7 @@ const ScheduleMeeting = () => {
                   type="time" 
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
-                  className='input-field'
+                  className='w-full px-4 py-3 rounded-xl bg-surface-elevated text-white border-2 border-brand-amber/30 outline-none transition-all duration-300 placeholder:text-[#cbd5e1] focus:border-brand-amber focus:shadow-[0_0_0_3px_rgba(255,186,8,0.15)]'
                   disabled={loading}
                 />
               </div>
@@ -195,7 +195,7 @@ const ScheduleMeeting = () => {
                 placeholder='Add meeting description or notes'
                 rows={3}
                 maxLength={500}
-                className='input-field resize-none'
+                className='w-full px-4 py-3 rounded-xl bg-surface-elevated text-white border-2 border-brand-amber/30 outline-none transition-all duration-300 placeholder:text-[#cbd5e1] focus:border-brand-amber focus:shadow-[0_0_0_3px_rgba(255,186,8,0.15)] resize-none'
                 disabled={loading}
               />
               <p className='text-xs text-text-muted mt-1'>{description.length}/500 characters</p>
@@ -210,14 +210,14 @@ const ScheduleMeeting = () => {
             <button 
               type="submit"
               disabled={loading}
-              className='btn-primary w-full text-center disabled:opacity-50 disabled:cursor-not-allowed text-base'
+              className='bg-brand-amber hover:bg-brand-orange text-brand-navy font-semibold px-6 py-3 rounded-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(255,186,8,0.3)] active:translate-y-0 w-full text-center disabled:opacity-50 disabled:cursor-not-allowed text-base'
             >
               {loading ? 'Scheduling...' : 'Schedule Meeting'}
             </button>
           </form>
         </div>
 
-        <div className='glass rounded-2xl p-6 md:p-8 animate-fade-up'>
+        <div className='bg-surface-card/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8 animate-fade-up'>
           <h2 className='text-xl md:text-2xl font-heading font-semibold text-text-primary mb-6 flex items-center'>
             <FaCalendarAlt className='mr-3 text-brand-amber' />
             Your Scheduled Meetings

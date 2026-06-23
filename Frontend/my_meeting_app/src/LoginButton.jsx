@@ -47,7 +47,7 @@ const LoginButton = ({ setUser }) => {
               textShadow: "0 0 20px rgba(255, 186, 8, 0.4), 0 0 40px rgba(255, 186, 8, 0.2)",
             }}
           >
-            STREAM<span className="text-gradient">APP</span>
+            STREAM<span className="bg-gradient-to-r from-brand-amber to-brand-orange bg-clip-text text-transparent">APP</span>
           </h1>
           <p className="tracking-[0.3em] text-white/60 text-sm md:text-base mb-8 uppercase">
             Professional Video Meetings

@@ -9,6 +9,7 @@ let segmentCounter = 0;
 let stopTimeout = null;
 let meetingStartTime = null; // Track when meeting recording started
 let currentChunkStartTime = 0; // Track when current chunk started recording
+let tokenGetter = null; // Store getAccessTokenSilently for upload calls
 
 export function isRecordingActive() {
   return isRecording && mediaRecorder && mediaRecorder.state === 'recording';
@@ -39,6 +40,7 @@ export async function startRecording(meetingName, userEmail = null, getAccessTok
     currentStream = stream;
     currentMeetingName = meetingName;
     isRecording = true;
+    tokenGetter = getAccessTokenSilently;
     
     // Initialize or restore meeting start time from localStorage
     const meetingStartKey = `meetingStartTime_${meetingName}_${userEmail}`;
@@ -208,7 +210,7 @@ function startSegmentRecording(stream, meetingName, userEmail, segmentIndex) {
 
       // Trigger upload (non-blocking)
       if (!isUploadInProgress()) {
-        uploadOldestSegment(meetingName, userEmail);
+        uploadOldestSegment(meetingName, userEmail, tokenGetter);
       }
 
     } catch (error) {

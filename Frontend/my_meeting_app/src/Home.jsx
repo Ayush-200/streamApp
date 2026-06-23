@@ -376,7 +376,7 @@ const Home = ({ setJoin }) => {
             </div>
           </header>
         ) : (
-          <header className='glass rounded-2xl p-6 mb-8 animate-fade-in'>
+          <header className='bg-surface-card/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 mb-8 animate-fade-in'>
             <div className='flex items-center justify-between flex-wrap gap-4'>
               <div>
                 <h2 className='text-xl md:text-2xl font-heading font-bold text-text-primary'>No Upcoming Meetings</h2>
@@ -387,7 +387,7 @@ const Home = ({ setJoin }) => {
               </div>
               <button 
                 onClick={() => navigate('/scheduleMeeting')}
-                className='btn-primary text-sm'
+                className='bg-brand-amber hover:bg-brand-orange text-brand-navy font-semibold px-6 py-3 rounded-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(255,186,8,0.3)] active:translate-y-0 text-sm'
               >
                 Schedule Meeting
               </button>
@@ -399,7 +399,7 @@ const Home = ({ setJoin }) => {
           <span className='text-5xl md:text-6xl lg:text-7xl font-heading font-bold text-text-primary'>
             Hello{' '}
           </span>
-          <span className='text-5xl md:text-6xl lg:text-7xl font-heading font-bold text-gradient'>
+          <span className='text-5xl md:text-6xl lg:text-7xl font-heading font-bold bg-gradient-to-r from-brand-amber to-brand-orange bg-clip-text text-transparent'>
             {userName.split(' ')[0]}
           </span>
         </div>
@@ -409,7 +409,7 @@ const Home = ({ setJoin }) => {
           {/* Create New Meeting */}
           <button
             onClick={() => navigate('/createMeetingForm')}
-            className='glass glass-hover rounded-2xl p-6 flex flex-col items-start gap-4 text-left group border border-border-default/40'
+            className='bg-surface-card/60 backdrop-blur-xl border border-white/10 transition-all duration-300 hover:bg-surface-hover hover:border-brand-amber/20 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)] rounded-2xl p-6 flex flex-col items-start gap-4 text-left group'
           >
             <div className='p-3.5 rounded-xl bg-brand-amber/10 text-brand-amber group-hover:bg-brand-amber group-hover:text-brand-navy transition-all duration-300'>
               <FaPlus className='text-2xl' />
@@ -421,7 +421,7 @@ const Home = ({ setJoin }) => {
           {/* Join Call */}
           <button
             onClick={() => { setJoin(true); navigate(`/joinMeetingForm`) }}
-            className='glass glass-hover rounded-2xl p-6 flex flex-col items-start gap-4 text-left group border border-border-default/40'
+            className='bg-surface-card/60 backdrop-blur-xl border border-white/10 transition-all duration-300 hover:bg-surface-hover hover:border-brand-amber/20 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)] rounded-2xl p-6 flex flex-col items-start gap-4 text-left group'
           >
             <div className='p-3.5 rounded-xl bg-brand-blue/10 text-brand-blue group-hover:bg-brand-amber group-hover:text-brand-navy transition-all duration-300'>
               <FaPhone className='text-2xl' />
@@ -433,7 +433,7 @@ const Home = ({ setJoin }) => {
           {/* Schedule Meeting */}
           <button
             onClick={() => navigate('/scheduleMeeting')}
-            className='glass glass-hover rounded-2xl p-6 flex flex-col items-start gap-4 text-left group border border-border-default/40'
+            className='bg-surface-card/60 backdrop-blur-xl border border-white/10 transition-all duration-300 hover:bg-surface-hover hover:border-brand-amber/20 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)] rounded-2xl p-6 flex flex-col items-start gap-4 text-left group'
           >
             <div className='p-3.5 rounded-xl bg-brand-amber/10 text-brand-amber group-hover:bg-brand-amber group-hover:text-brand-navy transition-all duration-300'>
               <FaCalendarAlt className='text-2xl' />
@@ -444,7 +444,7 @@ const Home = ({ setJoin }) => {
         </div>
 
         {/* Your Meetings Section */}
-        <div className='glass rounded-2xl p-6 animate-fade-up'>
+        <div className='bg-surface-card/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 animate-fade-up'>
           <h3 className='text-xl md:text-2xl font-heading font-bold text-text-primary mb-5 flex items-center'>
             <FaCalendarAlt className='mr-3 text-brand-amber' />
             Your Meetings
@@ -588,7 +588,7 @@ const Home = ({ setJoin }) => {
       </div>
 
       {/* User Footer */}
-      <footer className='glass border-t border-border-default/50'>
+      <footer className='bg-surface-card/60 backdrop-blur-xl border border-white/10 border-t border-border-default/50'>
         <div className='max-w-7xl mx-auto p-4 flex items-center justify-between'>
           <div className='flex items-center gap-3'>
             {user?.picture && (

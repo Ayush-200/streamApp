@@ -329,7 +329,7 @@
 
             {isLeaving && (
               <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-                <div className="glass rounded-2xl p-8 flex flex-col items-center gap-4 animate-scale-in">
+                <div className="bg-surface-card/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 flex flex-col items-center gap-4 animate-scale-in">
                   <div className="animate-spin rounded-full h-12 w-12 border-2 border-brand-amber border-t-transparent"></div>
                   <p className="text-text-primary text-lg font-heading font-semibold">Saving recording...</p>
                   <p className="text-text-muted text-sm">Please wait while we save your data</p>

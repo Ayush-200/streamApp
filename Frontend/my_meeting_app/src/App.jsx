@@ -28,7 +28,7 @@ function App() {
         <Route path = '*' element = {
           <div className='flex items-center justify-center min-h-screen bg-surface-dark'>
             <div className='text-center'>
-              <h1 className='text-6xl font-heading font-bold text-gradient mb-4'>404</h1>
+              <h1 className='text-6xl font-heading font-bold bg-gradient-to-r from-brand-amber to-brand-orange bg-clip-text text-transparent mb-4'>404</h1>
               <p className='text-text-secondary'>Page not found</p>
             </div>
           </div>
