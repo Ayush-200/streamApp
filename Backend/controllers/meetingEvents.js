@@ -4,6 +4,7 @@ import {
   handleUserJoined,
   handleUserLeft,
   handleUserDisconnect,
+  handleRecordingStarted,
   saveMeetingSessionsToDB,
   getActiveMeetingIds
 } from "../services/sessionManager.js";
@@ -21,6 +22,11 @@ export async function handleJoinMeeting(io, socket, { meetingId, userId }, recor
     socket.join(meetingId);
 
     handleUserJoined(meetingId, userId, socket.id);
+
+    // If recording is active, create a recording session for the joining user
+    if (recordingState.get(meetingId)) {
+        handleRecordingStarted(meetingId, userId);
+    }
 
     const meetingDoc = await MeetingParticipantDB.findOne({ meetingId });
     if (!meetingDoc) {
